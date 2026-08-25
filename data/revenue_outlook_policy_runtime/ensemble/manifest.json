@@ -29,7 +29,7 @@
   "provenance": {
     "builder_version": "2",
     "code_module_hashes": {
-      "app.py": "02817f7db880950b7f4edf5f95ea092b642d6b812c505876eae4612537d51fed",
+      "app.py": "4fe0325d0636f06f459e28105a4231ccbd4cb69acbe11493fb2b754451b30a55",
       "model_dashboard/__init__.py": "40f18fc5bbc37948a1250097bb55c68711d51d6622248e75efe27cd3580809f8",
       "model_dashboard/completeness_contract.py": "2a5ec576c757b7d4d820a060922dd5c7c7275841dc9734dcb479f9ad49a5c708",
       "model_dashboard/conflict_fuel_paths.py": "542e8fed674d164fae0620f8c1d0d0a45e6275af21ddfa3f99d862ec19b958e5",
@@ -50,6 +50,7 @@
       "model_dashboard/ev_uptake_levers.py": "ab4520eff520c2d5ce65faa4a02921e87445be515056d8a56d79170d0d277d73",
       "model_dashboard/evidence_pack.py": "52c0dd6dc63cecf1b0d64b534ecf5d0184afd4ed85c5fbc9c722657e38488419",
       "model_dashboard/fed_policy_states.py": "5fba4bbf4b289d2a554607274a5d09cf0e21464392b6b49355b50572f8c7a3bb",
+      "model_dashboard/fed_ruc_transition.py": "586263193a4234cd1daeecb021e77ea884a338b757b5246ae81718117519bc6b",
       "model_dashboard/forecast_imports.py": "d39fd287ab25d874ef1824618a3bc9027904aa6dea1718d16414670742780a15",
       "model_dashboard/forecast_runner.py": "123330cc285881ab042cee4231ebd57dffca6ce236f39fc28687385c8cf4644d",
       "model_dashboard/forward_scorer_governance.py": "044a83f4c50b51de90f1185dcb1d7f44f8b087d349078ee993c5af5d36d692fc",
@@ -65,7 +66,7 @@
       "model_dashboard/npv.py": "4806ef26bd957f637308b5f7d56198b327081542291a5cda6e82c8e6f340fc37",
       "model_dashboard/official_vintage.py": "9ab13f0f24d92a9096c67fd720eccb2b84c3d6bb99a8df7aa1e7bc3e29fc2f87",
       "model_dashboard/ped_forward.py": "92c3b5324ae798956679820a4e0b23314f2134a259c4b973d58640e6329325fa",
-      "model_dashboard/persistent_downside.py": "b74ef54ec1399911d84d330aa1e4a390bfc17d5d5c5fc577cc577106c0c66574",
+      "model_dashboard/persistent_downside.py": "319253e032ea2c21166929096298a5ed8d179f0c6735db94b84287bb9b710c1a",
       "model_dashboard/plots.py": "12af1e148ace95976c3345adfaab9dbab3e32cf5acbe64e8f7fa758ca46d1644",
       "model_dashboard/post_model_extrapolation.py": "9c5171e058f7044e14f275a3b164d0ab1105b85e05a50072a3d457930e0a4d0e",
       "model_dashboard/presentation.py": "1fc0dea91310e5eb6feedb76c6ed1ceadb5de69f02e35870282afa0c076496c2",
@@ -75,11 +76,11 @@
       "model_dashboard/reproducibility_imports.py": "dd2a1000837cc3f96fe557e74e64f0b270b09362225648e1d6aedcfb5a9529ba",
       "model_dashboard/revenue_chart_layers.py": "02ff7a97d7a340213b7ad160f26ee4a33c13ffaebefa55898d8ca6794f5e2748",
       "model_dashboard/revenue_outlook.py": "193e74584369e8d6ce8d0e67337067e59f290c48e4204280f4ebca01cf823b47",
-      "model_dashboard/revenue_outlook_excel_extract.py": "e30eb1c1be57bbfb6328e0c43edff44a365d75a3098e99ddf5fa2869be2f7505",
-      "model_dashboard/revenue_outlook_policy_runtime.py": "7be3639e7f9462e104bc377d9efcef5231edb6b109403e7361cb0415e1287c82",
+      "model_dashboard/revenue_outlook_excel_extract.py": "ab3e40067bcc185557883aa28385cbf6ed3b2a12dea9222f3bdb7021dc5ec0b8",
+      "model_dashboard/revenue_outlook_policy_runtime.py": "d2b5a71fdb047f7369a415ec5b350aaf2b4adb2f1948bb7320fa64d2ea89123f",
       "model_dashboard/revenue_outlook_presentation_policy.py": "8144bf675983caadc0096c8e5f0e152c0c13098e4d87e58361c6dc5984fb1f81",
       "model_dashboard/revenue_outlook_replay_cache.py": "f24ea4013bb9169612a8d63008fb1ded2626bf780c272df6270fcbd6705eb518",
-      "model_dashboard/revenue_scenario_key.py": "7db26b08d290d19815adcab6a9715ea4b9aba28346c0c1f219e04e8e5ec60e4b",
+      "model_dashboard/revenue_scenario_key.py": "f1637fcb0fcda23e6a5fe37b09b024acb0fd455aed278d360b275365c2bd96b4",
       "model_dashboard/revenue_source_pack.py": "61b9fd2b06d4c16add928656b9bd6e5cda9dcb38b0f3d9a0f60fb5c1e2cf8c9c",
       "model_dashboard/revenue_uncertainty.py": "f5e9907a3c3cf35fc659a575f5531249ae0cac92bfa7f1b4c2df183376e04ddf",
       "model_dashboard/revenue_uncertainty_draws.py": "3ee71c836cd6c58d42e24146cbb2855447635c1afb68d4b3c264b2bced281cd4",
@@ -469,8 +470,8 @@
   },
   "row_count": 2739432,
   "schema_version": "2",
-  "source_digest": "b90c3045eb02dfe64332095538135660317067a746b00cafaff5bc43ea716e49",
-  "source_main_sha": "7aeca892798b05f7133aab48a07f2da3b25f7677",
+  "source_digest": "6529aef906967baa9064edf6515cb865937a7d043ed420bbeb92a19bc135c32d",
+  "source_main_sha": "b9a58983dec54aacebacf1918e639643ab9ab03a",
   "state_count": 64,
   "states": [
     {
@@ -1627,6 +1628,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -1638,7 +1640,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "72a99cfe3091797e5adef3ad619d35f710abab4fc4081504221f5ac4e53e7ff3",
+      "scenario_key_digest": "9ff891a96ca7bddb2dc8db3c95dfc5218b71219df209a38f9469624548e574c3",
       "state_id": "ensemble__cur-published__off-published"
     },
     {
@@ -2837,6 +2839,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -2848,7 +2851,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "f66c623b5bff94b48acfae99b4239637a700e8da87797e8495f61e17d9c776fb",
+      "scenario_key_digest": "9e14190437187b51fd4d2605211408ba8ef5ceac9741d90a905a82edab3b6e3b",
       "state_id": "ensemble__cur-published__off-delayed_6m"
     },
     {
@@ -4047,6 +4050,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -4058,7 +4062,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "02a2b9f3ae79a3f08e8dd31bc51afc44d2834de72fc118f1aa1dc64ecd00f309",
+      "scenario_key_digest": "7cdad5589dbb5bf5679d84e228c93a6586d23fd88a7f6a815540a0d16eca42d1",
       "state_id": "ensemble__cur-published__off-delayed_12m"
     },
     {
@@ -5257,6 +5261,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -5268,7 +5273,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "22d17e78ae67c155a339e7ebd2ab25780fe78f9c9a6e985843c8cc7e5d8a1d6c",
+      "scenario_key_digest": "b2a52a962eba91af2107cc0b19cf9136a5553c2997217a57bcbba29861374cae",
       "state_id": "ensemble__cur-published__off-delayed_18m"
     },
     {
@@ -6467,6 +6472,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -6478,7 +6484,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "92bcee34163998ca07a081f5490b4c01673bf457f0edfc534ba913b23a130739",
+      "scenario_key_digest": "edb45fe9df6c6a38050fa2a5489e826792a74ee093f4f30d1cd6569ca9ad08c7",
       "state_id": "ensemble__cur-published__off-delayed_24m"
     },
     {
@@ -7677,6 +7683,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -7688,7 +7695,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "c6375d14948808dc13970f9764db738cc658fe19786301a1d139441aab57a6da",
+      "scenario_key_digest": "bceea51ddccc10576233498fa9b0aa40550ab324ebdd6c5d3209889fca0fced6",
       "state_id": "ensemble__cur-published__off-delayed_30m"
     },
     {
@@ -8887,6 +8894,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -8898,7 +8906,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "0aad16f778f6c2c73bd3dab5bd1a815fb821fb5c48f0e7760e236e4c9646f32e",
+      "scenario_key_digest": "adeec3e50a07ece34ddffe3b30b1c709a4b08117295241eb7ddea3ce55949531",
       "state_id": "ensemble__cur-published__off-delayed_36m"
     },
     {
@@ -10097,6 +10105,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -10108,7 +10117,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "03e12b04ce17918f6e6da7ba59c523ef6ff0a30df5da3f947e252129390a0d1c",
+      "scenario_key_digest": "98e054fd08c4a1cd4813c9da43306f3086a4c0b917e67be65e23c9a0675ac07f",
       "state_id": "ensemble__cur-published__off-off"
     },
     {
@@ -11311,6 +11320,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -11322,7 +11332,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "551c03f47c505f4ea5ba8959631b07cc843903a9f51f10e92093f2a0dc030a53",
+      "scenario_key_digest": "1134728944bda88b9bc85384957fc37290a5f044e533d7cf09e976e7bb84a371",
       "state_id": "ensemble__cur-delayed_6m__off-published"
     },
     {
@@ -12541,6 +12551,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -12552,7 +12563,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "fc533b64993e6d09fbb86f04e100f049da3e682932d21ae1f9c40f5833c17ee0",
+      "scenario_key_digest": "c5c3f9e70186c98677172145e3478f1028353b9866a5d6a37cd159030b7e80cc",
       "state_id": "ensemble__cur-delayed_6m__off-delayed_6m"
     },
     {
@@ -13771,6 +13782,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -13782,7 +13794,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "ca0e99c80286ec2ae3e37d404e89caac333e768f493fa171c3bc33e2fcb0ced2",
+      "scenario_key_digest": "89cccdbc5e71266adc49cd9363ead1a08803a4672e0bf11fbcba274791871e25",
       "state_id": "ensemble__cur-delayed_6m__off-delayed_12m"
     },
     {
@@ -15001,6 +15013,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -15012,7 +15025,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "e65b82ce892133ed46441a3b7fe576d8a06ca6e746ffe0dcc93fe5f864da5886",
+      "scenario_key_digest": "012b8943ff61a78bbf1f2032f0b69ef25050eb1cd803d452803ae0023d7cbe9b",
       "state_id": "ensemble__cur-delayed_6m__off-delayed_18m"
     },
     {
@@ -16231,6 +16244,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -16242,7 +16256,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "1f59194a74aec5f096fd43bde9a2cb1e32456eef7d79903d0123a4cfc29e5dfc",
+      "scenario_key_digest": "374473f668229477fefa41a8fd6ef090df55bc66cc52544e0d8ded49168dad33",
       "state_id": "ensemble__cur-delayed_6m__off-delayed_24m"
     },
     {
@@ -17461,6 +17475,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -17472,7 +17487,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "b7de27b4ac50bc4f15931724646f8d86d8bc55244b22d5bf3964f43fc71eaa38",
+      "scenario_key_digest": "afbfd1a48b78fa088e1401ee5135ce0a831c940f5a99501c0e7dd8f51ad0e8a7",
       "state_id": "ensemble__cur-delayed_6m__off-delayed_30m"
     },
     {
@@ -18691,6 +18706,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -18702,7 +18718,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "fce55d9f95f23713fc6b300d6dcdd89b472e009854767e9713ff6d5aa6246002",
+      "scenario_key_digest": "1a11129cbf3ee10b61999c7e16bfef5438e27013c3863fb2cc6e925cd3981f8c",
       "state_id": "ensemble__cur-delayed_6m__off-delayed_36m"
     },
     {
@@ -19921,6 +19937,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -19932,7 +19949,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "63a5f48a857dd9491191f0791a042dcca3f32f752182a2a1f5f9ba5f90977d4e",
+      "scenario_key_digest": "f567396b934fe930bcf9cfaa4cca77a63d39308c0badad91236def2bfe3a8288",
       "state_id": "ensemble__cur-delayed_6m__off-off"
     },
     {
@@ -21135,6 +21152,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -21146,7 +21164,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "2780ed8a40c85828d20f0b1e684123c66b405a73eac15d2c86a416786c7ee698",
+      "scenario_key_digest": "6d9e9df0caafe8057202fb4327ff4fbe99bec37084a2722b2989629a6168187d",
       "state_id": "ensemble__cur-delayed_12m__off-published"
     },
     {
@@ -22365,6 +22383,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -22376,7 +22395,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "71c1fda755b4190d7c52e71018f478f12f28b32545538bb8eb23c431afadaf18",
+      "scenario_key_digest": "2ce6f2cf490a32ef17127f766a8edf963e55b49a6013fe9323d2da5b37ef05bc",
       "state_id": "ensemble__cur-delayed_12m__off-delayed_6m"
     },
     {
@@ -23595,6 +23614,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -23606,7 +23626,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "a02bac6103d4eb41400b492b845cedb4081b8f8949c64da71e3a625a0a16b40a",
+      "scenario_key_digest": "c093476439a946f1d1785255ae9ba7e88862fb1fd1617ae8a01787bb5a9ebd99",
       "state_id": "ensemble__cur-delayed_12m__off-delayed_12m"
     },
     {
@@ -24825,6 +24845,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -24836,7 +24857,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "e85940925141e0dcd29aee88dda8990b53eecc00180e4178c864cce2526578a0",
+      "scenario_key_digest": "91f426872c2976e4c21f8581827de22f3d3113df54c20d6f3a2ddd00bc13b10f",
       "state_id": "ensemble__cur-delayed_12m__off-delayed_18m"
     },
     {
@@ -26055,6 +26076,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -26066,7 +26088,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "a837ed0fe45516e92b84e83172a9a2f5e6709da6b3374327febb6d9214ae1b6e",
+      "scenario_key_digest": "20c5f589818ff74da6b379b2c1a357f1258d144e5d62d6525c0632ef47a2494b",
       "state_id": "ensemble__cur-delayed_12m__off-delayed_24m"
     },
     {
@@ -27285,6 +27307,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -27296,7 +27319,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "0b2cb6ea9337d26f3f8f579784882d9092d2939bf0736f589bd1de42336af7ed",
+      "scenario_key_digest": "a001e4feff12bb8b1a445bb0a90ac8eb9f09680cc5bfc8e419d1e16dce75b4c4",
       "state_id": "ensemble__cur-delayed_12m__off-delayed_30m"
     },
     {
@@ -28515,6 +28538,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -28526,7 +28550,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "081a90cbc0b060798611089ae53c2da03c49a1575a8c638d876f7bcb2f7d14f9",
+      "scenario_key_digest": "9bdf3db4f7b3b2f6a564dda4690baf7d8fd3d34351bb253b5a2e5653fcb6eff3",
       "state_id": "ensemble__cur-delayed_12m__off-delayed_36m"
     },
     {
@@ -29745,6 +29769,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -29756,7 +29781,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "14829bea76b3c64c5f394c861684c56dbb056c186c1d6a0c8b9dd05ad3307151",
+      "scenario_key_digest": "43cc08eb8088e8867bc7578344517307082cc11a9a245ca0b3d17ffa924bb69d",
       "state_id": "ensemble__cur-delayed_12m__off-off"
     },
     {
@@ -30959,6 +30984,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -30970,7 +30996,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "b21d296e070047fd8f0e16c0e68d440388475a87de795f7372a8f6ec8543e6f9",
+      "scenario_key_digest": "bc3dc72835374296ebefe70c4f06c5eebfde031bbc7b46124bd2d317a3b7cbef",
       "state_id": "ensemble__cur-delayed_18m__off-published"
     },
     {
@@ -32189,6 +32215,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -32200,7 +32227,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "095a8ed1ee1ac4e7d1f54ea7a0a3d63623183fc9e37d0cb3be00f5977510710c",
+      "scenario_key_digest": "2d06953b56fef3bd6339df37f544bcc68b9329ac24bd449e3555e745e300d884",
       "state_id": "ensemble__cur-delayed_18m__off-delayed_6m"
     },
     {
@@ -33419,6 +33446,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -33430,7 +33458,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "19d3ba3bcb466a30f348ed389979946c7a039d3c460aa0ee09b765cffe3f7755",
+      "scenario_key_digest": "9f8a0f069286b5c2ea3619291d5cc5b6c7ee46fd7e119a17cb4dba273265982e",
       "state_id": "ensemble__cur-delayed_18m__off-delayed_12m"
     },
     {
@@ -34649,6 +34677,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -34660,7 +34689,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "4597f35bf62a6621deae93da6e798c38c9503b43d9c51c61071199bbdaf79c46",
+      "scenario_key_digest": "4f8929364a91cf25c9346e4bebc5f504c6c2d1cd403d77020fc747356f78c1fe",
       "state_id": "ensemble__cur-delayed_18m__off-delayed_18m"
     },
     {
@@ -35879,6 +35908,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -35890,7 +35920,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "72e14b8c7a8470d942e97fe2d603cfcd4794f4ed916ab2df9236acb663abd9e1",
+      "scenario_key_digest": "5f5f2bc614e0440ea713b28bc680a24b47bbeb1879ec1cf8f6de8d27094015db",
       "state_id": "ensemble__cur-delayed_18m__off-delayed_24m"
     },
     {
@@ -37109,6 +37139,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -37120,7 +37151,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "9a297378f7a8965d52d809ed700b70e94b001154bdd8ae538ef88adf6385e7d7",
+      "scenario_key_digest": "2d2dbbdabb8d7a1395cafc0d71b60c4f3712a1315862e63ebe79a051c490dc30",
       "state_id": "ensemble__cur-delayed_18m__off-delayed_30m"
     },
     {
@@ -38339,6 +38370,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -38350,7 +38382,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "2f48f6c06dd2adea19b583177ec8aeeed3d5c0ccbd9976ab31f49aeb58cf7823",
+      "scenario_key_digest": "fa2defb96b55761e3f368385cff95eb0aabb56f5b48a003ba7075adc364ea431",
       "state_id": "ensemble__cur-delayed_18m__off-delayed_36m"
     },
     {
@@ -39569,6 +39601,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -39580,7 +39613,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "0d5cdc5c8467912c608fa1c205f1c173515f68d9bfad15742898be5fa3aa49d2",
+      "scenario_key_digest": "cc016683f7d5cd7a68fee749605660a4c4576ca8d3cca56fab61e01568b1e94e",
       "state_id": "ensemble__cur-delayed_18m__off-off"
     },
     {
@@ -40783,6 +40816,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -40794,7 +40828,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "f43cca114cf2d61e1473d93856221fea9614d06ab488abd0ebfe26ed886373ea",
+      "scenario_key_digest": "c21f1e25ac2b1d29e13cb2bb95abb7a79834c0a2f44d8db940affafde037f89f",
       "state_id": "ensemble__cur-delayed_24m__off-published"
     },
     {
@@ -42013,6 +42047,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -42024,7 +42059,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "7b31ff8e0ec685a18123b182f4f4230d5639a5ca6bd856fb7f8e72bb5b074c85",
+      "scenario_key_digest": "5a9fe8f4c1552bff9459c3a9afbdc5903d48ae8c8818c624fc192dee165a023b",
       "state_id": "ensemble__cur-delayed_24m__off-delayed_6m"
     },
     {
@@ -43243,6 +43278,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -43254,7 +43290,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "5f832cbe1291c0b32b16fc687ab2f5934e67271c3c5d0a388379b9cb9b58b4a1",
+      "scenario_key_digest": "fc3ebb495e4b4014f4ac30f7b8abdb91776f489fc30089e4bd94a2707f1bf58d",
       "state_id": "ensemble__cur-delayed_24m__off-delayed_12m"
     },
     {
@@ -44473,6 +44509,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -44484,7 +44521,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "099822e27e4e00eec1e8821ec7ac60a3c3325bd35f62f808c59f9950469d10ab",
+      "scenario_key_digest": "48fe626a2e9340db4fa2c2faae81054f8cdc825813480de87cc339fb7af8bf29",
       "state_id": "ensemble__cur-delayed_24m__off-delayed_18m"
     },
     {
@@ -45703,6 +45740,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -45714,7 +45752,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "ba862b1cbcee3abb9eb0f61288cdcaa4dcbca0374bf4ff3ff66ee6c2d1a613ca",
+      "scenario_key_digest": "cf5482278f5ccd248921101a695bf2c87ef4ac12a50252eb99385f27f52f2eaf",
       "state_id": "ensemble__cur-delayed_24m__off-delayed_24m"
     },
     {
@@ -46933,6 +46971,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -46944,7 +46983,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "8e746432431f4076a99f649bd4198d16961154503500198ff1c347415eef308d",
+      "scenario_key_digest": "c4dd7b9d980ecb8749c1a8d2c7281d983f9be60434820bdfd3f1a8163ba29134",
       "state_id": "ensemble__cur-delayed_24m__off-delayed_30m"
     },
     {
@@ -48163,6 +48202,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -48174,7 +48214,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "ab5a569d30cf41c549c7ac539647a947ed796a88aa4b33c2d175f224354aee53",
+      "scenario_key_digest": "26f446751c744c51e4cf15f86271bc1a4f364e6136bd1f941d83df3517028bf5",
       "state_id": "ensemble__cur-delayed_24m__off-delayed_36m"
     },
     {
@@ -49393,6 +49433,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -49404,7 +49445,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "2ec069ecf33c3339736fe78fca1eda1c48bf374ce106eb0338a3f56c5842bc42",
+      "scenario_key_digest": "c744c0a9d7b7e2e152294772f1526162ea97e353b3a03552d7e0b0b88c177ac5",
       "state_id": "ensemble__cur-delayed_24m__off-off"
     },
     {
@@ -50607,6 +50648,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -50618,7 +50660,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "41d6c0077fddbd2f679ea2cb22d3838d5bd8f9795026274135d9e8b02b96f6ee",
+      "scenario_key_digest": "c19143083e8933d944727d5cd23363b0c157a724ee070358d818338a169ddf5c",
       "state_id": "ensemble__cur-delayed_30m__off-published"
     },
     {
@@ -51837,6 +51879,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -51848,7 +51891,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "5a6ded3d1771c94eb7c4bfd23f77cb887b10e82457510d5809a29643862d8ff5",
+      "scenario_key_digest": "b9b23735848e66dd79578a5b12594a734a63a2b998b5dcd12c58d095cb32bd43",
       "state_id": "ensemble__cur-delayed_30m__off-delayed_6m"
     },
     {
@@ -53067,6 +53110,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -53078,7 +53122,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "7e682a812770f1c8c7e4a4223eab6016e5040351e404e32cc90a5287bc3f0aa4",
+      "scenario_key_digest": "fda9090286426b27e0ad16726b1d9579da2bd78404aa709bf40e357cc68a9062",
       "state_id": "ensemble__cur-delayed_30m__off-delayed_12m"
     },
     {
@@ -54297,6 +54341,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -54308,7 +54353,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "a7e9d4dce33bdf5b4a2c66683b16bfc57ca72bb1c4e167f09afafb70a6a2a0c2",
+      "scenario_key_digest": "aa93f7267c5fcda9e8bfe1f0042b3777dd487bde239c77c26cfdc8d82ae6f48f",
       "state_id": "ensemble__cur-delayed_30m__off-delayed_18m"
     },
     {
@@ -55527,6 +55572,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -55538,7 +55584,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "e04426e28ac867433d2edfff42709190079c2cf68d040deb74dc5b81f888b332",
+      "scenario_key_digest": "94c0ca2de2c98a31280739aa207067c19820b3c009535f3bbdc1108a344eedff",
       "state_id": "ensemble__cur-delayed_30m__off-delayed_24m"
     },
     {
@@ -56757,6 +56803,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -56768,7 +56815,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "a309dafb6b9c020c221dc343a13bb8fa92e77f00438c74ff1cc6b82ffe61f6ba",
+      "scenario_key_digest": "f56ab0e62fa358436409d45168473f47815a5cc2043ad29b670474484f66662c",
       "state_id": "ensemble__cur-delayed_30m__off-delayed_30m"
     },
     {
@@ -57987,6 +58034,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -57998,7 +58046,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "a21d4e0db421ba39b29b543960badf39e5cf28d09c48ba0c69d054b439449b5c",
+      "scenario_key_digest": "98a2f8d289977c550840a64d136527aa70478853f80672a5c118b7a6a5fcf19f",
       "state_id": "ensemble__cur-delayed_30m__off-delayed_36m"
     },
     {
@@ -59217,6 +59265,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -59228,7 +59277,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "02add5f4037d5505549cf6bc9fdc93c967adad248c31b49029c875f0d9612c8d",
+      "scenario_key_digest": "756f5466d0d039b8eca4cca50c12e2c5ec80bbaa33f75f25780005880d0cebae",
       "state_id": "ensemble__cur-delayed_30m__off-off"
     },
     {
@@ -60431,6 +60480,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -60442,7 +60492,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "359e6664aae7c318f19a5d6ac99ae1dfdfa42e3012ca42549763f03e059e95e5",
+      "scenario_key_digest": "a07df1624b15c1515e893343a32af9b324e16bc32525f53165eda161f32ee043",
       "state_id": "ensemble__cur-delayed_36m__off-published"
     },
     {
@@ -61661,6 +61711,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -61672,7 +61723,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "09e065769e832ec5191dc9b84763783fa610e142eac440e3dd412bc69f20ad99",
+      "scenario_key_digest": "16619916c40907c968fa6afb0821cea4f2a572d7b968b77f9916fb60b8601f56",
       "state_id": "ensemble__cur-delayed_36m__off-delayed_6m"
     },
     {
@@ -62891,6 +62942,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -62902,7 +62954,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "1d024f224ddd553ef5b69d77bc6376c05744ae61636a0fb946b7310fcf2303a5",
+      "scenario_key_digest": "0e62d4d6a49417a8d1192ab735da592f7972963060cf377e130626c37136b183",
       "state_id": "ensemble__cur-delayed_36m__off-delayed_12m"
     },
     {
@@ -64121,6 +64173,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -64132,7 +64185,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "4d06c693f10b42fc107d6b428ab38e8af57ffedfa3d7498e7462d33ee8b7bf95",
+      "scenario_key_digest": "24099b3f45087c34c7144952fb463af5acf1e0da45b3b67039199661de08d0fd",
       "state_id": "ensemble__cur-delayed_36m__off-delayed_18m"
     },
     {
@@ -65351,6 +65404,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -65362,7 +65416,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "b004e6f4189826a5c5e22117b6f7459ccc8ebbdaa5730abce7209827fbaefa5f",
+      "scenario_key_digest": "b20c9f8c7b5b8669bcedd791fe07e53efb6d343c6dbe0bd1523fdd421625de19",
       "state_id": "ensemble__cur-delayed_36m__off-delayed_24m"
     },
     {
@@ -66581,6 +66635,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -66592,7 +66647,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "a1c17fd3b3231612f18610b7ee49307ce1800acdd670a06011943568a78db704",
+      "scenario_key_digest": "8f9a61817c53402297eaae7b18cdbd8f6181c6a039ecd1fd1e268cf10dccd102",
       "state_id": "ensemble__cur-delayed_36m__off-delayed_30m"
     },
     {
@@ -67811,6 +67866,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -67822,7 +67878,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "6a57b316cbcd2177c1dee1935e097a661ee22fc7433e4d74c9df89e0087de301",
+      "scenario_key_digest": "72940b8218724cc77aa1ad5aa5c58ba4a713219964de70dd0005ad723760b25e",
       "state_id": "ensemble__cur-delayed_36m__off-delayed_36m"
     },
     {
@@ -69041,6 +69097,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -69052,7 +69109,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "090517e772bb2a6de7bcd8f3ecc2cad5ee4502bf8f36b999cadd85064b405235",
+      "scenario_key_digest": "c24dfc7be9c254016f8d0b30c2a49a13f678848724462bc72c25b290d0a8fd6e",
       "state_id": "ensemble__cur-delayed_36m__off-off"
     },
     {
@@ -70255,6 +70312,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -70266,7 +70324,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "dc856e7749d29e848917ecdb9b0e592e107f1a593c66b146878c0f88d5e60e36",
+      "scenario_key_digest": "d91a02a9524533942b8765c3e61d1de82baaa97a38d75717da639e62ed673747",
       "state_id": "ensemble__cur-off__off-published"
     },
     {
@@ -71485,6 +71543,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -71496,7 +71555,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "839e29f8ccf962339e4d30c21efd3a26da324a350ed104509c8c294eff443664",
+      "scenario_key_digest": "4aa54e8a61c95c66906f766869c8511733f54a6c77b57b57aa2c648bf135bdc8",
       "state_id": "ensemble__cur-off__off-delayed_6m"
     },
     {
@@ -72715,6 +72774,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -72726,7 +72786,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "d6c0ffd31b9fb1fc52ef2cd402664044d654c9f026013db733edba186e343f3b",
+      "scenario_key_digest": "0e0f2e71f302f34f7867d2ae11b6aa1a77390c4f2e4c17814cde17b47cb50e98",
       "state_id": "ensemble__cur-off__off-delayed_12m"
     },
     {
@@ -73945,6 +74005,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -73956,7 +74017,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "f9ca57be125c37872e9ff889635f81568b839303728030c35dcf40ebf8dd9f15",
+      "scenario_key_digest": "a29ea57ca572d31199278af08c8826ab7aed7ad53ed7486715ee8a241e90307a",
       "state_id": "ensemble__cur-off__off-delayed_18m"
     },
     {
@@ -75175,6 +75236,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -75186,7 +75248,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "6ad64d24cd7bc7b1922c1be0283356bfc00483d1e609e3c70b4b765f85f36a78",
+      "scenario_key_digest": "0583fa441ef11cda2508b02c9c509e579ab3489b30f3060438ba7f15ab7bb64a",
       "state_id": "ensemble__cur-off__off-delayed_24m"
     },
     {
@@ -76405,6 +76467,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -76416,7 +76479,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "62a51759fdc780a881aa17995391ab8c6ee374702b27e1418f7ed6f6bfba7a3a",
+      "scenario_key_digest": "3acff20e4d4021121fc70a11ad0862f24c2f87fd3a1ac6537a8e321b8704165c",
       "state_id": "ensemble__cur-off__off-delayed_30m"
     },
     {
@@ -77635,6 +77698,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -77646,7 +77710,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "f0d381cded823ffffe46fb8f3bb03c83356376c1622521d078d92cb64b69a2bd",
+      "scenario_key_digest": "4d1e32e28053d42619bc056e55fe6095fb3d8d595378c10d3bfb258cbe87e68d",
       "state_id": "ensemble__cur-off__off-delayed_36m"
     },
     {
@@ -78865,6 +78929,7 @@
         "custom_ev_levers": [],
         "engine": "ensemble",
         "eruc_levers": [],
+        "fed_ruc_transition": "off",
         "heavy_bev_transition": false,
         "long_run_shape_vintage_id": "PREBU26",
         "long_run_transition_schedule_id": "growth_handover_fy2035",
@@ -78876,7 +78941,7 @@
         "ped_retention_sensitivity": false,
         "uptake_basis": "MoT VFM base"
       },
-      "scenario_key_digest": "392405f5e8b6241dd6925dee62aec9c220aa4119fb9d0deede765b635351075b",
+      "scenario_key_digest": "1ebff8e1444d20c0236c000d49e14b6b284cb3bc04e8d09e805e66656e7dc99c",
       "state_id": "ensemble__cur-off__off-off"
     }
   ],
@@ -78897,5 +78962,5 @@
     "streams": "PED,LIGHT_RUC,HEAVY_RUC"
   },
   "uncertainty_series": 40,
-  "uncertainty_sha256": "733767d3189e24869ac815372f496d6c74ceafea518926011da3030b52cd4298"
+  "uncertainty_sha256": "441680eb1b7935d0725112a3e53f1284bfb6c190a1fb1ec62d4eefe07fae5614"
 }
