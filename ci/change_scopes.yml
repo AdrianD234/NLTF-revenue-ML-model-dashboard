@@ -78,6 +78,7 @@ test_groups:
       - tests/test_ev_uptake_levers.py
       - tests/test_fleet_mix.py
       - tests/test_eruc_transition.py
+      - tests/test_fed_ruc_transition.py
       - tests/test_fuel_price_scenario.py
       - tests/test_light_fleet_allocation.py
       - tests/test_long_run_shape_transition.py
@@ -445,6 +446,7 @@ rules:
       - "model_dashboard/ev_uptake_levers.py"
       - "model_dashboard/fleet_mix.py"
       - "model_dashboard/eruc_transition.py"
+      - "model_dashboard/fed_ruc_transition.py"
       - "model_dashboard/fuel_price_scenario.py"
       - "model_dashboard/light_fleet_allocation.py"
       - "model_dashboard/long_run_shape_transition.py"
