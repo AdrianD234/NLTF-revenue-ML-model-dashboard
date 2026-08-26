@@ -266,13 +266,15 @@ jobs:
     # selection and then the whole suite would pay for the same tests twice.
     if: needs.plan.outputs.run_affected == 'true' && needs.plan.outputs.run_full != 'true'
     runs-on: ubuntu-latest
-    # 120, not 90: high-risk merge-commit plans select a broader set than the
-    # PR branch ran (PR #37's post-merge run hit the 90-minute cap at 1h30
-    # with zero failures, and reruns cannot fix a structural timeout), and the
-    # FED->RUC transition selector adds focused composition tests on top of
-    # the policy-runtime suite whose 16-pair reference-parity test alone needs
-    # ~30-40 minutes on this 2-CPU runner.
-    timeout-minutes: 120
+    # 180, matching full assurance: on a high-risk merge commit the planner's
+    # affected selection is effectively the complete suite (governed_pack
+    # scope), so this lane needs the same budget as the full clean-clone run.
+    # PR #41's post-merge run proved 120 structurally short: cancelled at
+    # exactly 2h00m with zero failures, while the same tree's pre-merge full
+    # assurance passed in 2h05. (History: 45 -> 90 after PR #34/#35, 90 -> 120
+    # after PR #37, 120 -> 180 after PR #41 - each raise was a post-merge
+    # merge-commit cancellation with zero failures.)
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
