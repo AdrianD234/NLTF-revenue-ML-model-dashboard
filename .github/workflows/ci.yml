@@ -266,13 +266,20 @@ jobs:
     # selection and then the whole suite would pay for the same tests twice.
     if: needs.plan.outputs.run_affected == 'true' && needs.plan.outputs.run_full != 'true'
     runs-on: ubuntu-latest
-    # 120, not 90: high-risk merge-commit plans select a broader set than the
-    # PR branch ran (PR #37's post-merge run hit the 90-minute cap at 1h30
-    # with zero failures, and reruns cannot fix a structural timeout), and the
-    # FED->RUC transition selector adds focused composition tests on top of
-    # the policy-runtime suite whose 16-pair reference-parity test alone needs
-    # ~30-40 minutes on this 2-CPU runner.
-    timeout-minutes: 120
+    # 300, matching full assurance: on a high-risk merge commit the planner's
+    # affected selection is effectively the complete suite (governed_pack
+    # scope), so this lane always needs the same budget as the full
+    # clean-clone run and the two values move together.
+    #
+    # 300 (5h) is a deliberate owner decision (2026-08-26) to stop the
+    # raise-by-30-minutes treadmill: the caps were cancelled-at-the-wire with
+    # ZERO failures four times as the suite grew (45 -> 90 after PR #34/#35,
+    # 90 -> 120 after PR #37, 120 -> 180 after PR #41's post-merge run was
+    # cancelled at exactly 2h00 while the same tree's full assurance passed
+    # in 2h05). The suite is ~2h05 today; 300 leaves ~3h of growth headroom
+    # while staying under GitHub's hard 6h per-job kill. The timeout's only
+    # remaining job is to surface a HUNG run, which 5h still does.
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
 
@@ -323,14 +330,14 @@ jobs:
     needs: plan
     if: needs.plan.outputs.run_full == 'true'
     runs-on: ubuntu-latest
-    # The suite crossed the previous 120-minute cap when the persistent
-    # downside, the growth-handover candidates and the conflict macro channel
-    # landed (pytest alone measured 1h49 on the hosted runner). 180, not 150:
-    # the FED->RUC transition selector grows the suite again (three transition
-    # states composed against representative economic and FED-timing states),
-    # and 150 left only ~25 minutes of headroom before it landed; 180 keeps
-    # the same margin rather than cancelling a green run at the wire.
-    timeout-minutes: 180
+    # 300 (5h), moving together with the Affected lane above - see the full
+    # rationale there. The measured full-suite run is ~2h05 today (PR #41);
+    # the caps were outgrown four times (120 -> 150 -> 180 history in git),
+    # each costing a cancelled green run and a follow-up PR, so the owner
+    # sized this to the failure mode instead: ~3h of suite-growth headroom,
+    # under GitHub's hard 6h per-job kill, still small enough to surface a
+    # genuinely hung run.
+    timeout-minutes: 300
     steps:
       - uses: actions/checkout@v4
 
