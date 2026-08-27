@@ -3,7 +3,7 @@
 Writes, under artifacts/fed_deferral_duration/:
   * policy_state_registry.csv    - the canonical registry, one row per state;
   * quarterly_rate_paths.csv     - the governed quarterly schedule, all states;
-  * scenario_matrix_inventory.csv - the 32 public paths with full metadata;
+  * scenario_matrix_inventory.csv - the 48 public paths with full metadata;
   * interaction_test_matrix.csv  - representative multi-lever combinations
     run through the production overlay chain, with the gates each satisfied;
   * source_manifest.json         - SHA, generator and source hashes.
@@ -45,6 +45,8 @@ def build_registry_csv() -> pd.DataFrame:
                 "display_order": spec.display_order,
                 "is_published": spec.is_published,
                 "is_no_uplift": spec.is_no_uplift,
+                "is_bespoke": spec.is_bespoke,
+                "schedule_kind": spec.schedule_kind,
                 "schedule_column": spec.schedule_column,
                 "path_suffix": spec.path_suffix,
                 "pair_state_suffix": spec.pair_state_suffix,
@@ -53,7 +55,11 @@ def build_registry_csv() -> pd.DataFrame:
                 "direct_affected_quarters": (
                     ";".join(spec.direct_affected_quarters())
                     if spec.is_finite_deferral
-                    else ("2027Q1_onward" if spec.is_no_uplift else "")
+                    else (
+                        "2027Q1_onward"
+                        if spec.is_no_uplift
+                        else ("derived_from_governed_schedule" if spec.is_bespoke else "")
+                    )
                 ),
                 "note": spec.note,
             }

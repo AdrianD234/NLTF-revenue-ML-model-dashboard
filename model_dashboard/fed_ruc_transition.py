@@ -44,7 +44,7 @@ RUC) and aggregated to the June-year grain the revenue layer uses:
   assumption (the model carries no governed inflation index).
 
 Applied as a deterministic display-time overlay after the policy-runtime
-state is loaded: governed pack bytes are untouched, the materialised 8x8
+state is loaded: governed pack bytes are untouched, the materialised 12x12
 policy catalogue is not multiplied, and every adjusted row is tagged for
 audit.
 """

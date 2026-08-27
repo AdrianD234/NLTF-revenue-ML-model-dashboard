@@ -4,20 +4,21 @@ Profiling (``scripts/profile_revenue_outlook_policy_toggle.py``) measured the
 first selection of each policy state at ~13.5 s per process, of which the
 policy arithmetic is 0.33 s; the rest is every stage downstream of the
 computation key being invalidated with it.  Both policy controls are
-drop-downs over the eight governed states, so this script runs the reference
+drop-downs over the twelve governed states, so this script runs the reference
 pipeline once per named state, offline, and commits exactly what the runtime
 reads back.
 
     python scripts/build_revenue_outlook_policy_runtime.py --all
     python scripts/build_revenue_outlook_policy_runtime.py --engine ar1
 
-Sixty-four states per engine (eight Current x eight official comparator,
-from the canonical policy-state registry), NOT a Cartesian cube over other
-levers: every other value-changing control is pinned at the governed default
-the promoted pack recorded, and the runtime refuses any key that differs
-rather than serving the nearest cached state. Policy-aware uncertainty
-centres depend on the Current state only, so exactly eight centres are
-computed per engine, never sixty-four.
+One hundred and forty-four states per engine (twelve Current x twelve
+official comparator, from the canonical policy-state registry), NOT a
+Cartesian cube over other levers: every other value-changing control is
+pinned at the governed default the promoted pack recorded, and the runtime
+refuses any key that differs rather than serving the nearest cached state.
+Policy-aware uncertainty centres depend on the Current state only, so
+exactly twelve centres are computed per engine, never one hundred and
+forty-four.
 
 The build refuses to publish unless every frame round-trips exactly and every
 materialised state equals the reference pipeline it came from.

@@ -1,17 +1,17 @@
 {
-  "generated_at_utc": "2026-08-20T03:23:49.280026+00:00",
+  "generated_at_utc": "2026-08-27T07:22:59.660502+00:00",
   "generator": "scripts/build_fed_deferral_evidence.py",
   "outputs": {
-    "interaction_test_matrix.csv": "03c06ecd7dd3be45150a3cf0cf7150f72d99dc2bea93ef8581895ecebfb28c5b",
-    "policy_state_registry.csv": "1282a3051ad1aafbb0c24f28dd53eafe96d8acd72ad9f8ca08aa6a9a201512f7",
-    "quarterly_rate_paths.csv": "cc91b5c0723fcfa6f40c81563f59d2066bd70415993cbfc838ea5b39a253e942",
-    "scenario_matrix_inventory.csv": "dede065f1e075c0983e382094f388fed05fe8d09c4ef399d197fbeaf3bc958a1"
+    "interaction_test_matrix.csv": "3e8e6c3fbafd223e91ff6f813c62cb191c7f5d82b86b788a47d0632b73112e49",
+    "policy_state_registry.csv": "6eaa9f720bab633c0f367debc4148aec4821023a6490553ac24bc0ed5aae553f",
+    "quarterly_rate_paths.csv": "08c5ba0e3911966006dfd4dbe09bf827bb2ab2521ab68fef7ded87d5d7fbe1f6",
+    "scenario_matrix_inventory.csv": "6d3e2990fbafa20c36687a95d77c18239eebff704554bdb60762f1652b006069"
   },
   "source_hashes": {
-    "data/current_revenue_outlook/conflict_fuel_price_scenarios.csv": "ad379997aa4044cdabf7d948787c926e06a434447ff076640cfab317eda53c73",
-    "data/current_revenue_outlook/sensitivity_seed_inputs.csv": "5181058396fbdb3896ade20b3ea335955fc186af85cccd365c7d86531852f3a6",
+    "data/current_revenue_outlook/conflict_fuel_price_scenarios.csv": "7daf48033da3b9e3f8655aa7cacd302ebd1876b28e2fa03d20b66ea029f782a6",
+    "data/current_revenue_outlook/sensitivity_seed_inputs.csv": "ec16691e19856cacfdf5e41124fd846bf3ff43e6ad0e60dd7c104e1306751ff6",
     "data/revenue_model_source_pack/2026_05_19/fed_rate_paths.csv": "37eaad93d4f3c5373fe2569c62841f5216dc7ff10c8a868debc2c7ed61f25269",
-    "model_dashboard/fed_policy_states.py": "3c31d59c0c9d7273b2431d7e77252dec799311b234e52ee825836be50f61b11d"
+    "model_dashboard/fed_policy_states.py": "188fe5d553d8b42289746b2b93f236480d935be5fd3e23f0096707677569a53a"
   },
-  "source_sha": "675dc52e487ee9112cb7dcfe52d9945c43065c93"
+  "source_sha": "36c474ad69a841467584ae2de03a8a40ea79f811"
 }

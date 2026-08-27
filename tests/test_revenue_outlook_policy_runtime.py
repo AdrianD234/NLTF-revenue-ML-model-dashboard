@@ -214,9 +214,10 @@ def test_no_uplift_spelling_variants_resolve_to_one_state():
 
 # The stratified sample the HOSTED core job checks against the reference:
 # every legacy pair (the original 3x3), each new duration as Current at a
-# rotating official state, and each new duration as the official synthetic
-# counterfactual at rotating Current states. Local full assurance still runs
-# the exhaustive 64-pair walk.
+# rotating official state, each new duration as the official synthetic
+# counterfactual at rotating Current states, and each bespoke rate path
+# (Options 1-4) on both axes. Local full assurance still runs the exhaustive
+# 144-pair walk.
 REPRESENTATIVE_STATE_PAIRS = (
     *((current, official) for current in ("published", "delayed_6m", "off")
       for official in ("published", "delayed_6m", "off")),
@@ -227,6 +228,13 @@ REPRESENTATIVE_STATE_PAIRS = (
     ("delayed_36m", "published"),
     ("published", "delayed_12m"),
     ("off", "delayed_36m"),
+    ("option1_12c_10c_4c", "published"),
+    ("option2_9c_9c_4c", "off"),
+    ("option3_4c_semiannual", "delayed_6m"),
+    ("published", "option3_4c_semiannual"),
+    ("option3_4c_semiannual", "option1_12c_10c_4c"),
+    ("option4_labour_4c", "published"),
+    ("published", "option4_labour_4c"),
 )
 
 
@@ -304,7 +312,7 @@ def _assert_state_pairs_equal_reference(runtime, engine, pairs):
 @pytest.mark.exhaustive_runtime_parity
 @pytest.mark.parametrize("engine", ENGINES)
 def test_every_materialised_state_equals_the_reference_pipeline(runtimes, engine, reference_pipeline):
-    """The whole contract, checked frame by frame on all sixty-four states.
+    """The whole contract, checked frame by frame on all 144 states.
 
     384 reference overlay runs per engine pair-walk: local full assurance and
     the pack builder run it; the hosted 2-CPU core job deselects it (stated in

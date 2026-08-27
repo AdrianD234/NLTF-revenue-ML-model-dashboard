@@ -395,7 +395,17 @@ def test_leakage_applies_only_to_the_newly_transitioned_base(
 
 
 @pytest.mark.parametrize(
-    "policy_state", ["published", "delayed_6m", "delayed_12m", "delayed_36m", "off"]
+    "policy_state",
+    [
+        "published",
+        "delayed_6m",
+        "delayed_12m",
+        "delayed_36m",
+        "off",
+        "option1_12c_10c_4c",
+        "option3_4c_semiannual",
+        "option4_labour_4c",
+    ],
 )
 def test_composes_with_representative_timing_states(schedule, policy_state) -> None:
     rows = _catalogue_rows(policy_state)

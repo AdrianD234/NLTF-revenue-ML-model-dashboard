@@ -85,13 +85,13 @@ __all__ = [
     "state_id_for",
 ]
 
-# Schema 2 / builder 2: the finite policy catalogue expanded from three
-# Current states x three official states (nine materialised states per
-# engine) to eight x eight (sixty-four), adding the 12-36 month deferrals.
-# Packs built at schema 1 fail closed as stale rather than serving a
-# catalogue that cannot answer the new states.
-POLICY_RUNTIME_SCHEMA_VERSION = "2"
-BUILDER_VERSION = "2"
+# Schema 3 / builder 3: the finite policy catalogue expanded again, from
+# eight x eight (sixty-four materialised states per engine) to twelve x
+# twelve (one hundred and forty-four), adding the four bespoke rate paths
+# (Options 1-4). Packs built at earlier schemas fail closed as stale rather
+# than serving a catalogue that cannot answer the new states.
+POLICY_RUNTIME_SCHEMA_VERSION = "3"
+BUILDER_VERSION = "3"
 
 _PACK_ROOT = Path("data") / "revenue_outlook_policy_runtime"
 _REBUILD_COMMAND = "python scripts/build_revenue_outlook_policy_runtime.py --all"
@@ -507,8 +507,8 @@ class PolicyRuntime:
     """One engine's materialised policy states, lazily read and memoised.
 
     Holding the decoded frames per state is what makes a repeated selection a
-    dict lookup rather than a parquet read. With the 8x8 catalogue the whole
-    engine no longer safely fits in memory (64 states x 11 frames), so the
+    dict lookup rather than a parquet read. With the 12x12 catalogue the whole
+    engine no longer safely fits in memory (144 states x 11 frames), so the
     memo is BOUNDED: least-recently-inserted frames are evicted once the memo
     exceeds sixteen states' worth. Eviction changes when a frame is re-read
     from its hash-validated parquet, never what it equals.
@@ -517,7 +517,7 @@ class PolicyRuntime:
     # Sixteen states' worth of decoded frames. Far above what a real session
     # touches (a reader flips between a handful of states), far below the
     # whole catalogue, which is what exhausted the clean-room container when
-    # a parity test walked all 64 states.
+    # a parity test walked the full catalogue (then 64 states).
     _MAX_MEMOISED_FRAMES = 16 * len(FRAME_NAMES)
 
     def __init__(
