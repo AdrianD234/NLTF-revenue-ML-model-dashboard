@@ -664,11 +664,12 @@ def test_bespoke_registry_metadata_is_explicit() -> None:
     assert all(not spec.is_bespoke for spec in finite_deferral_specs())
     assert policy_spec("option3_4c_semiannual").short_policy_phrase == "Option 3"
     assert policy_spec("option4_labour_4c").short_policy_phrase == "Option 4"
-    # The Labour scenario is a user-defined illustrative path, and its
-    # metadata must say so rather than presenting it as sourced policy.
+    # The Labour scenario models the party's ANNOUNCED Election-2026 fuel
+    # excise freeze, and its metadata must draw the announced/assumed line:
+    # the freeze is announced policy, the 2030 +4c/L resumption is not.
     labour = policy_spec("option4_labour_4c")
-    assert "user-defined illustrative" in labour.note
-    assert "rather than a sourced or officially announced party policy" in labour.note
+    assert "announced Election-2026 fuel excise freeze" in labour.note
+    assert "modelling assumption, not announced policy" in labour.note
 
 
 def test_superseded_no_uplift_label_spellings_still_resolve() -> None:

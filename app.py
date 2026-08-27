@@ -7178,9 +7178,9 @@ def _render_lever_accordion(
                     "+4c annually from 1 Jan 2028; Option 2: 9c then 9c then +4c annually from "
                     "1 Jan 2028; Option 3: a temporary +4c every six months from 1 Jul 2027 to "
                     "1 Jan 2029, then +4c annually from 2030, a constant 6c below published from "
-                    "mid-2028; Option 4, a user-defined illustrative Labour scenario: no "
-                    "increases at all until +4c annually from 1 Jan 2030, a constant 22c below "
-                    "published thereafter). "
+                    "mid-2028; Option 4, modelled on Labour's announced fuel excise freeze: no "
+                    "increases at all until +4c annually from 1 Jan 2030 - the 2030 resumption "
+                    "is a modelling assumption - a constant 22c below published thereafter). "
                     + FED_DEFERRAL_CATCH_UP_NOTE
                 ),
                 **_widget_default_kwargs(

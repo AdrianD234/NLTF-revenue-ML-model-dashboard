@@ -571,16 +571,17 @@ FED_POLICY_SPECS: tuple[FedPolicySpec, ...] = (
         ),
         order=11,
         note=(
-            "Bespoke rate path, a user-defined illustrative scenario rather "
-            "than a sourced or officially announced party policy. NOT the "
-            "36-month full-staircase deferral: the original +12c/L and "
-            "+6c/L increases never land and never catch up. The rate holds "
-            "the governed pre-uplift base through 2029Q4, then rises +4c/L "
-            "on 1 January 2030 and every later 1 January through the "
-            "governed horizon. Published timing reaches r0+26c by 2030Q1 "
-            "while this path reaches only r0+4c, and both then add +4c "
-            "annually, so the path sits a constant 22c/L below published "
-            "timing from 2030Q1 onward. "
+            "Bespoke rate path modelled on Labour's announced Election-2026 "
+            "fuel excise freeze (no increases for the full parliamentary "
+            "term). NOT the 36-month full-staircase deferral: the original "
+            "+12c/L and +6c/L increases and the 2029 4c step never land and "
+            "never catch up - the rate holds the governed pre-uplift base "
+            "through 2029Q4. The resumption of +4c/L at every 1 January "
+            "from 1 January 2030 through the governed horizon is a "
+            "modelling assumption, not announced policy. Published timing "
+            "reaches r0+26c by 2030Q1 while this path reaches only r0+4c, "
+            "and both then add +4c annually, so the path sits a constant "
+            "22c/L below published timing from 2030Q1 onward. "
             + _BESPOKE_TRANSMISSION_NOTE
         ),
     ),
