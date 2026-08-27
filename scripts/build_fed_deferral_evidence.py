@@ -3,7 +3,7 @@
 Writes, under artifacts/fed_deferral_duration/:
   * policy_state_registry.csv    - the canonical registry, one row per state;
   * quarterly_rate_paths.csv     - the governed quarterly schedule, all states;
-  * scenario_matrix_inventory.csv - the 44 public paths with full metadata;
+  * scenario_matrix_inventory.csv - the 48 public paths with full metadata;
   * interaction_test_matrix.csv  - representative multi-lever combinations
     run through the production overlay chain, with the gates each satisfied;
   * source_manifest.json         - SHA, generator and source hashes.

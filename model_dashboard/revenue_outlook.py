@@ -973,9 +973,9 @@ def net_revenue_timing_comparison_frame(
             for level in CONFLICT_FUEL_SCENARIO_LEVELS
         ),
     )
-    # Registry-driven: all eleven governed timing states per family, in
+    # Registry-driven: all twelve governed timing states per family, in
     # display order (published, the six finite deferrals, no uplift, then
-    # the three bespoke rate paths).
+    # the four bespoke rate paths).
     timing_specs = tuple(
         (spec.timing_id, spec.calculation_state_id, spec.timing_label, spec)
         for spec in FED_POLICY_SPECS
@@ -1264,7 +1264,7 @@ def net_revenue_timing_comparison_frame(
         if not np.allclose(off_delta[through_fy2027], 0.0, rtol=0.0, atol=1e-9):
             raise ValueError(
                 f"The bespoke path ({spec.timing_id}) must match the no-uplift "
-                "path through FY2027: its schedule begins at 1 Jan 2028."
+                "path through FY2027: no bespoke schedule steps before 1 Jan 2028."
             )
         if int(start_fy) <= 2027 <= int(end_fy):
             fy2027_tax = (timing_fy == 2027) & tax_series

@@ -639,7 +639,7 @@ def test_registry_ids_are_unique_and_legacy_alias_points_to_medium() -> None:
         if not spec.is_published
     ]
     assert len(set(published)) == 3
-    assert len(set(variants)) == 30
+    assert len(set(variants)) == 33
     assert set(published).isdisjoint(variants)
     assert FUEL_PRICE_SCENARIO_NAME == conflict_scenario_name("medium")
     assert FUEL_PRICE_SCENARIO_TRACE_NAME == conflict_trace_name("medium")
@@ -999,7 +999,7 @@ def test_fixed_finalist_replay_preserves_base_and_orders_governed_conflict_paths
             for state in non_published_states
         ),
     }
-    assert len(expected_scenarios) == 44
+    assert len(expected_scenarios) == 48
     assert set(validation.index) == expected_scenarios
     assert validation["valid"].all()
     assert set(validation["forecast_horizon_quarters"].astype(int)) == {100}
@@ -1110,11 +1110,11 @@ def test_fixed_finalist_replay_preserves_base_and_orders_governed_conflict_paths
         )
 
 
-def test_policy_replay_builds_forty_four_paths_with_formula_closed_net_ruc(
+def test_policy_replay_builds_forty_eight_paths_with_formula_closed_net_ruc(
     fuel_replay,
 ) -> None:
     validation = fuel_replay.policy_validation_report.set_index("scenario_name")
-    assert len(validation) == 44
+    assert len(validation) == 48
     assert validation["valid"].all()
     # Per-stream seam: PED 100 + Light 99 + Heavy 99 scored quarters.
     assert set(validation["numeric_forecast_rows"].astype(int)) == {298}
@@ -1317,12 +1317,12 @@ def test_policy_replay_builds_forty_four_paths_with_formula_closed_net_ruc(
             np.testing.assert_allclose(delayed, off, rtol=0.0, atol=1e-9)
 
 
-def test_ar1_pack_replays_forty_four_paths_and_retains_source_lineage(
+def test_ar1_pack_replays_forty_eight_paths_and_retains_source_lineage(
     ar1_fuel_replay,
 ) -> None:
     _assert_governed_policy_demand_calibration(ar1_fuel_replay)
     validation = ar1_fuel_replay.policy_validation_report.set_index("scenario_name")
-    assert len(validation) == 44
+    assert len(validation) == 48
     assert validation["valid"].all()
     assert set(validation["forecast_horizon_quarters"].astype(int)) == {100}
     # Per-stream seam: PED 100 + Light 99 + Heavy 99 scored quarters.

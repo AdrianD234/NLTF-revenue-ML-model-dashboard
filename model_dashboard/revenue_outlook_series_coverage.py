@@ -1172,7 +1172,7 @@ def _actual_quarter_lookup(
     return lookup
 
 
-# The eleven governed 12c policy states, mapped onto the columns
+# The twelve governed 12c policy states, mapped onto the columns
 # ``rate_paths.ped_quarterly_rate_schedules`` already publishes. The schedule
 # is NOT duplicated here - this is a column selection over the one governed
 # source (derived from the canonical registry), so a change to the timetable

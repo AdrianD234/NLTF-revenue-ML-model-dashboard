@@ -116,7 +116,7 @@ _SCHEDULE_COLUMN_BY_STATE = {
 _DEFERRAL_SEGMENTS = tuple(spec.schedule_column for spec in finite_deferral_specs())
 _BESPOKE_SEGMENTS = tuple(spec.schedule_column for spec in bespoke_specs())
 # Every policy-generated schedule column in display order: the six deferrals,
-# the no-uplift wedge, then the three bespoke step paths.
+# the no-uplift wedge, then the four bespoke step paths.
 _POLICY_SEGMENTS = (*_DEFERRAL_SEGMENTS, "no_uplift", *_BESPOKE_SEGMENTS)
 FED_POLICY_METADATA_COLUMNS = (
     "_fed_baseline_value",
@@ -273,13 +273,14 @@ def ped_quarterly_rate_schedules(repo_root: Path) -> pd.DataFrame:
     to published: each deferred year leaves the rate 4c/L below original
     timing in every later year.
 
-    The three bespoke step paths are neither rule: each prices at the
-    no-uplift schedule before its first step (the 2027 uplift never occurs),
-    then accumulates its own explicit ex-GST steps on the governed pre-uplift
-    base through the schedule horizon. A bespoke path may rejoin the
-    published staircase (Option 1 at 2029Q1) or cross above it (Option 3 at
-    roughly 2031Q3); no below-published or duration-ordering constraint
-    applies to them.
+    The four bespoke step paths are neither rule: each holds the governed
+    pre-uplift base from the uplift start until its own first step (no
+    legislated increase ever occurs on a bespoke path), then accumulates its
+    explicit ex-GST steps on that base through the schedule horizon. A
+    bespoke path may rejoin the published staircase (Option 1 at 2029Q1),
+    cross above it (Option 3 at roughly 2031Q3), or hold a constant mature
+    wedge below it (Option 4: 22c/L from 2030Q1); no below-published or
+    duration-ordering constraint applies to them.
     """
     fed = _fed_rate_paths(repo_root)
     pivot = fed.pivot_table(
@@ -408,40 +409,48 @@ def ped_quarterly_rate_schedules(repo_root: Path) -> pd.DataFrame:
         else:
             pivot[spec.schedule_column] = pivot["planned"]
             pivot.loc[window_mask, spec.schedule_column] = window_no_uplift
-    # Bespoke step paths: the 2027 uplift never occurs (the path prices at the
-    # governed no-uplift schedule before its first step), then the spec's own
-    # explicit ex-GST steps accumulate on the pre-uplift base r0. r0 is read
-    # from the schedule itself - the no-uplift rate immediately before the
-    # first bespoke step - and cross-checked against the pre-staircase planned
-    # base so the rule genuinely means "the 2027 uplift never happened".
+    # Bespoke step paths: NO legislated increase ever occurs (neither the
+    # 2027 12c/L uplift nor the separately scheduled 6c/4c steps) - the path
+    # holds the governed pre-uplift base r0 from the uplift start until its
+    # own first step, then the spec's explicit ex-GST steps accumulate on r0.
+    # r0 is the planned rate immediately before the uplift start, read from
+    # the schedule itself and cross-checked against the no-uplift rate at the
+    # uplift start so the rule genuinely means "the 2027 uplift never
+    # happened". (Options 1-3 start at 2028Q1, so their pre-step segment
+    # coincides with the no-uplift schedule; Option 4's first step is 2030Q1
+    # and it deliberately does NOT pick up the no-uplift path's 2028 6c and
+    # 2029 4c steps.)
     no_uplift_by_serial = {
         quarter_serial(quarter): value
         for quarter, value in zip(pivot["quarter"], pivot["no_uplift"])
         if pd.notna(value)
     }
-    pre_uplift_base = planned_by_serial.get(uplift_serial - 1, np.nan)
+    r0 = planned_by_serial.get(uplift_serial - 1, np.nan)
+    if pd.isna(r0) or float(r0) <= 0.0:
+        raise ValueError(
+            "The governed FED rate schedule carries no positive planned rate "
+            f"immediately before {FED_UPLIFT_START_PERIOD}; the bespoke "
+            "pre-uplift base cannot be derived."
+        )
+    no_uplift_at_start = no_uplift_by_serial.get(uplift_serial, np.nan)
+    if pd.isna(no_uplift_at_start) or abs(float(r0) - float(no_uplift_at_start)) > 1e-9:
+        raise ValueError(
+            f"The bespoke pre-uplift base ({float(r0)!r}) does not equal the "
+            f"governed no-uplift rate at {FED_UPLIFT_START_PERIOD} "
+            f"({no_uplift_at_start!r}); the bespoke rule assumes the 2027 "
+            "uplift never occurred."
+        )
     for spec in bespoke_specs():
         schedule = spec.bespoke_schedule
         first_serial = quarter_serial(schedule.first_step_period)
-        r0 = no_uplift_by_serial.get(first_serial - 1, np.nan)
-        if pd.isna(r0) or float(r0) <= 0.0:
-            raise ValueError(
-                f"The governed FED rate schedule cannot express {spec.state_id!r}: "
-                f"no positive no-uplift rate exists immediately before "
-                f"{schedule.first_step_period}."
-            )
-        if pd.isna(pre_uplift_base) or abs(float(r0) - float(pre_uplift_base)) > 1e-9:
-            raise ValueError(
-                f"The bespoke base for {spec.state_id!r} ({float(r0)!r}) does not "
-                "equal the governed pre-uplift planned rate "
-                f"({pre_uplift_base!r}); the bespoke rule assumes the 2027 "
-                "uplift never occurred."
-            )
         bespoke_values = []
-        for quarter, no_uplift_value in zip(pivot["quarter"], pivot["no_uplift"]):
+        for quarter, planned_value in zip(pivot["quarter"], pivot["planned"]):
             serial = quarter_serial(quarter)
+            if serial < uplift_serial:
+                bespoke_values.append(planned_value)
+                continue
             if serial < first_serial:
-                bespoke_values.append(no_uplift_value)
+                bespoke_values.append(float(r0))
                 continue
             value = float(r0) + schedule.cumulative_increase(quarter)
             # Where a bespoke path is meant to coincide with the published

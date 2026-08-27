@@ -1,8 +1,8 @@
 """Registry, schedule and factor gates for the governed 12c policy states.
 
 Covers the acceptance tests the deferral-duration handoff names:
-  * exactly eleven canonical states: published, six finite deferrals
-    (quarters {2,4,...,12}), no-uplift, and three bespoke rate paths;
+  * exactly twelve canonical states: published, six finite deferrals
+    (quarters {2,4,...,12}), no-uplift, and four bespoke rate paths;
   * unique IDs, labels, display order and start periods;
   * the exact deferred start quarters;
   * legacy aliases resolve; unknown states fail closed everywhere;
@@ -11,10 +11,12 @@ Covers the acceptance tests the deferral-duration handoff names:
   * quarterly and annual factor exactness;
   * the generic six-month state equals the legacy six-month wrappers within
     one process (environment-independent equivalence gate);
-  * the bespoke Options 1-3: exact quarterly pins, FY2027 identity with the
+  * the bespoke Options 1-4: exact quarterly pins, FY2027 identity with the
     no-uplift path, Option 1's published rejoin, Option 2's 12-month-shift
-    equivalence from 2029Q1, and Option 3's semiannual staircase crossing
-    above published at 2031Q3.
+    equivalence from 2029Q1, Option 3's semiannual staircase crossing above
+    published at 2031Q3, and Option 4's (Labour scenario) flat pause to
+    2029Q4 followed by +4c annually with a constant 22c mature wedge below
+    published.
 """
 from __future__ import annotations
 
@@ -53,6 +55,7 @@ EXPECTED_STATE_IDS = (
     "option1_12c_10c_4c",
     "option2_9c_9c_4c",
     "option3_4c_semiannual",
+    "option4_labour_4c",
 )
 EXPECTED_CALC_IDS = (
     "published",
@@ -66,6 +69,7 @@ EXPECTED_CALC_IDS = (
     "option1_12c_10c_4c",
     "option2_9c_9c_4c",
     "option3_4c_semiannual",
+    "option4_labour_4c",
 )
 EXPECTED_STARTS = ("2027Q3", "2028Q1", "2028Q3", "2029Q1", "2029Q3", "2030Q1")
 EXPECTED_LABELS = (
@@ -80,6 +84,7 @@ EXPECTED_LABELS = (
     "Option 1 — 12c on 1 Jan 2028, 10c on 1 Jan 2029, then +4c annually",
     "Option 2 — 9c on 1 Jan 2028, 9c on 1 Jan 2029, then +4c annually",
     "Option 3 — +4c every six months from 1 Jan 2028",
+    "Option 4 — Labour scenario: 36-month pause, then +4c annually from 1 Jan 2030",
 )
 BESPOKE_STATE_IDS = EXPECTED_STATE_IDS[8:]
 # Direct rate-affected calendar-quarter windows per finite deferral. The
@@ -114,11 +119,11 @@ NO_UPLIFT_BY_YEAR = {2027: 0.70024, 2028: 0.76024, 2029: 0.80024, 2030: 0.84024}
 # --------------------------------------------------------------- A. registry
 
 
-def test_registry_has_exactly_eleven_states_in_display_order() -> None:
+def test_registry_has_exactly_twelve_states_in_display_order() -> None:
     assert policy_state_ids() == EXPECTED_STATE_IDS
     assert calculation_state_ids() == EXPECTED_CALC_IDS
     assert tuple(spec.label for spec in FED_POLICY_SPECS) == EXPECTED_LABELS
-    assert tuple(spec.display_order for spec in FED_POLICY_SPECS) == tuple(range(11))
+    assert tuple(spec.display_order for spec in FED_POLICY_SPECS) == tuple(range(12))
 
 
 def test_registry_has_exactly_six_finite_deferrals() -> None:
@@ -634,6 +639,12 @@ BESPOKE_COLUMNS = ("option1_12c_10c_4c", "option2_9c_9c_4c", "option3_4c_semiann
 def test_bespoke_registry_metadata_is_explicit() -> None:
     specs = bespoke_specs()
     assert tuple(spec.state_id for spec in specs) == BESPOKE_STATE_IDS
+    expected_starts = {
+        "option1_12c_10c_4c": ("2028Q1", "1 Jan 2028"),
+        "option2_9c_9c_4c": ("2028Q1", "1 Jan 2028"),
+        "option3_4c_semiannual": ("2028Q1", "1 Jan 2028"),
+        "option4_labour_4c": ("2030Q1", "1 Jan 2030"),
+    }
     for spec in specs:
         assert spec.is_bespoke
         assert spec.schedule_kind == "bespoke_steps"
@@ -644,13 +655,18 @@ def test_bespoke_registry_metadata_is_explicit() -> None:
         assert spec.path_suffix == spec.state_id
         assert spec.timing_id == spec.state_id
         assert spec.timing_label == spec.label
-        assert spec.start_period == "2028Q1"
-        assert spec.start_date_text == "1 Jan 2028"
+        assert (spec.start_period, spec.start_date_text) == expected_starts[spec.state_id]
         with pytest.raises(PolicyStateError):
             spec.direct_affected_quarters()
     # Deferral vocabulary is untouched: bespoke states never enter it.
     assert all(not spec.is_bespoke for spec in finite_deferral_specs())
     assert policy_spec("option3_4c_semiannual").short_policy_phrase == "Option 3"
+    assert policy_spec("option4_labour_4c").short_policy_phrase == "Option 4"
+    # The Labour scenario is a user-defined illustrative path, and its
+    # metadata must say so rather than presenting it as sourced policy.
+    labour = policy_spec("option4_labour_4c")
+    assert "user-defined illustrative" in labour.note
+    assert "rather than a sourced or officially announced party policy" in labour.note
 
 
 def test_superseded_no_uplift_label_spellings_still_resolve() -> None:
@@ -670,20 +686,21 @@ def test_bespoke_quarterly_pins(quarterly) -> None:
 
 
 def test_bespoke_paths_identical_through_fy2027(quarterly) -> None:
-    """All three options equal each other AND the no-uplift path before their
-    first step: the 2027 12c uplift never occurs on any of them."""
+    """All four options equal each other AND the no-uplift path before
+    1 Jan 2028: no bespoke schedule steps earlier, and the 2027 12c uplift
+    never occurs on any of them."""
     no_uplift = pd.to_numeric(quarterly["no_uplift"], errors="coerce")
-    first_step = quarter_serial("2028Q1")
-    for column in BESPOKE_COLUMNS:
-        target = pd.to_numeric(quarterly[column], errors="coerce")
+    first_possible_step = quarter_serial("2028Q1")
+    for spec in bespoke_specs():
+        target = pd.to_numeric(quarterly[spec.schedule_column], errors="coerce")
         for quarter in quarterly.index:
-            if quarter_serial(str(quarter)) >= first_step:
+            if quarter_serial(str(quarter)) >= first_possible_step:
                 continue
             if pd.isna(no_uplift.at[quarter]):
-                assert pd.isna(target.at[quarter]), (column, quarter)
+                assert pd.isna(target.at[quarter]), (spec.state_id, quarter)
                 continue
             assert float(target.at[quarter]) == float(no_uplift.at[quarter]), (
-                column,
+                spec.state_id,
                 quarter,
             )
 
@@ -795,3 +812,97 @@ def test_official_comparator_factors_for_every_bespoke_state() -> None:
         # here - but no below-published bound is part of the contract.
         fy2027 = frame[frame["june_year"].astype(int).eq(2027)]
         assert not fy2027.empty and (fy2027["factor"] < 1.0).all()
+
+
+# The consultant's Labour-scenario pins: flat at r0 through 2029Q4, then
+# +4c/L at every later 1 January - the 12c and 6c increases never land.
+LABOUR_PIN_TABLE = {
+    "2029Q4": 0.70024,
+    "2030Q1": 0.74024,
+    "2030Q3": 0.74024,
+    "2031Q1": 0.78024,
+    "2032Q1": 0.82024,
+    "2035Q1": 0.94024,
+    "2040Q1": 1.14024,
+    "2050Q1": 1.54024,
+}
+
+
+def test_labour_scenario_quarterly_pins(quarterly) -> None:
+    labour = pd.to_numeric(quarterly["option4_labour_4c"], errors="coerce")
+    for quarter, expected in LABOUR_PIN_TABLE.items():
+        assert float(labour.at[quarter]) == pytest.approx(expected, abs=1e-12), quarter
+
+
+def test_labour_scenario_is_flat_at_r0_until_2030(quarterly) -> None:
+    """No rate change at all before 2030Q1: neither the 12c, nor the 6c, nor
+    any 4c step - the path holds the governed pre-uplift base, sitting BELOW
+    the no-uplift schedule from 2028Q1 (which keeps the 6c and 4c steps)."""
+    labour = pd.to_numeric(quarterly["option4_labour_4c"], errors="coerce")
+    no_uplift = pd.to_numeric(quarterly["no_uplift"], errors="coerce")
+    for quarter in quarterly.index:
+        serial = quarter_serial(str(quarter))
+        if serial < quarter_serial(FED_UPLIFT_START_PERIOD) or serial >= quarter_serial("2030Q1"):
+            continue
+        assert float(labour.at[quarter]) == pytest.approx(0.70024, abs=1e-12), quarter
+        if serial >= quarter_serial("2028Q1"):
+            assert float(labour.at[quarter]) < float(no_uplift.at[quarter]), quarter
+
+
+def test_labour_scenario_steps_four_cents_at_every_january_from_2030(quarterly) -> None:
+    """Exactly +4c at every Q1 from 2030 through the horizon; no step in any
+    Q2/Q3/Q4 and none before 2030Q1."""
+    labour = pd.to_numeric(quarterly["option4_labour_4c"], errors="coerce")
+    steps: list[tuple[str, float]] = []
+    previous = None
+    for quarter in quarterly.index:
+        value = labour.at[quarter]
+        if pd.isna(value):
+            continue
+        if quarter_serial(str(quarter)) < quarter_serial("2026Q1"):
+            previous = float(value)
+            continue
+        if previous is not None and abs(float(value) - previous) > 1e-9:
+            steps.append((str(quarter), round(float(value) - previous, 5)))
+        previous = float(value)
+    expected_serials = list(
+        range(quarter_serial("2030Q1"), quarter_serial("2050Q4") + 1, 4)
+    )
+    assert [quarter_serial(quarter) for quarter, _ in steps] == expected_serials
+    for quarter, size in steps:
+        assert size == pytest.approx(0.04), quarter
+        assert quarter.endswith("Q1"), quarter
+
+
+def test_labour_scenario_holds_a_constant_22c_wedge_below_published(quarterly) -> None:
+    """Published reaches r0+26c by 2030Q1 against this path's r0+4c; both
+    then add +4c annually, so the 22c/L wedge is constant to the horizon."""
+    labour = pd.to_numeric(quarterly["option4_labour_4c"], errors="coerce")
+    planned = pd.to_numeric(quarterly["planned"], errors="coerce")
+    for quarter in quarterly.index:
+        if quarter_serial(str(quarter)) < quarter_serial("2030Q1"):
+            continue
+        if pd.isna(planned.at[quarter]):
+            continue
+        assert float(planned.at[quarter]) - float(labour.at[quarter]) == pytest.approx(
+            0.22, abs=1e-9
+        ), quarter
+
+
+def test_labour_scenario_is_not_the_36_month_staircase_shift(quarterly) -> None:
+    """Under delay_36m the 12c lands at 2030Q1 (0.82024) and the rest of the
+    staircase follows; under the Labour scenario the 12c never lands."""
+    labour = pd.to_numeric(quarterly["option4_labour_4c"], errors="coerce")
+    shifted_36m = pd.to_numeric(quarterly["delayed_36m"], errors="coerce")
+    assert float(labour.at["2030Q1"]) == pytest.approx(0.74024)
+    assert float(shifted_36m.at["2030Q1"]) == pytest.approx(0.82024)
+    # The shift lands 12c vs Labour's 4c in 2030 (8c gap), adds its deferred
+    # 6c step in 2031 while Labour adds 4c (10c gap), and both step +4c
+    # annually thereafter, so the gap holds at exactly 10c to the horizon.
+    assert float(shifted_36m.at["2030Q1"]) - float(labour.at["2030Q1"]) == pytest.approx(
+        0.08, abs=1e-9
+    )
+    for quarter in ("2031Q1", "2035Q1", "2040Q1", "2050Q1"):
+        assert float(shifted_36m.at[quarter]) - float(labour.at[quarter]) == pytest.approx(
+            0.10, abs=1e-9
+        ), quarter

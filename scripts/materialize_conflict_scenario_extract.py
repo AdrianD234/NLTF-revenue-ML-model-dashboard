@@ -80,10 +80,11 @@ from model_dashboard.revenue_outlook import (
 
 START_FY = 2026
 END_FY = 2030
-# v5: the timing dimension expanded from eight states to eleven, adding the
-# three bespoke rate paths (Options 1-3: no 12c in 2027 then their own ex-GST
-# steps from 1 Jan 2028); 44 paths in total. Values on the original 32 paths
-# are unchanged apart from the clarified no-uplift policy label.
+# v5: the timing dimension expanded from eight states to twelve, adding the
+# four bespoke rate paths (Options 1-4: no legislated increases, each holding
+# the pre-uplift base until its own first ex-GST step); 48 paths in total.
+# Values on the original 32 paths are unchanged apart from the clarified
+# no-uplift policy label.
 EXTRACT_VERSION = "governed-ar1-conflict-scenario-extract-v5"
 ASSUMPTIONS_FILENAME = "conflict_scenario_assumptions.csv"
 REVENUE_FILENAME = "conflict_scenario_annual_revenue.csv"
@@ -132,7 +133,7 @@ _SERIES_METADATA["total_fed_ruc_net_revenue"] = {
 
 @dataclass(frozen=True)
 class ExportPath:
-    """Stable metadata for one of the 44 requested export paths."""
+    """Stable metadata for one of the 48 requested export paths."""
 
     family_id: str
     family_order: int
@@ -162,7 +163,7 @@ def _scenario_id_for(family_severity: str, calculation_state_id: str) -> str:
 
 
 def _export_paths() -> tuple[ExportPath, ...]:
-    """The 44 public paths: four families crossed with eleven timing states."""
+    """The 48 public paths: four families crossed with twelve timing states."""
     paths: list[ExportPath] = []
     family_specs = [
         ("base", 0, "", "Current finalist Base case"),
@@ -2111,9 +2112,9 @@ def _validation_frame(
             max_abs_error=float(shared_error) if pd.notna(shared_error) else None,
             detail=(
                 f"The {timing} bespoke path skips the 2027 uplift entirely and "
-                "prices at the governed no-uplift schedule until its first step "
-                "at 1 Jan 2028, so through FY2027 it is identical to off (and "
-                "therefore to every other bespoke option)."
+                "holds the pre-uplift base until its own first step (2028Q1 for "
+                "Options 1-3, 2030Q1 for Option 4), so through FY2027 it is "
+                "identical to off (and therefore to every other bespoke option)."
             ),
         )
 
@@ -2224,8 +2225,9 @@ def _validation_frame(
                 detail=(
                     f"A bespoke path carries no fixed side of {reference_name}: "
                     "Option 1 rejoins the published staircase, Option 3 crosses "
-                    "above it, and Option 3 sits below the no-uplift path during "
-                    "calendar 2028. The governed quarterly schedule is the single "
+                    "above it, Option 3 sits below the no-uplift path during "
+                    "calendar 2028, and Option 4 sits below no-uplift from 2028 "
+                    "onward. The governed quarterly schedule is the single "
                     "source of truth for which side each fiscal year falls on."
                 ),
             )

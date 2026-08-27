@@ -273,8 +273,8 @@ def test_revenue_outlook_fleet_layout_and_timing_csv_download(page: Page) -> Non
     download = download_info.value
     assert download.suggested_filename == "net_revenue_12c_timing_comparison_fy2026_fy2030.csv"
     frame = pd.read_csv(download.path())
-    # Registry-driven: 4 families x 11 timing states x 5 FY x 3 series.
-    assert len(frame) == 660
+    # Registry-driven: 4 families x 12 timing states x 5 FY x 3 series.
+    assert len(frame) == 720
     assert not frame.duplicated(["path_id", "FY", "series_id"]).any()
     assert set(frame["path_id"]) == {
         f"{family}_{spec.path_suffix}"
@@ -285,7 +285,7 @@ def test_revenue_outlook_fleet_layout_and_timing_csv_download(page: Page) -> Non
     path_metadata = frame[
         ["path_id", "scenario_id", "policy_state"]
     ].drop_duplicates()
-    assert len(path_metadata) == 44
+    assert len(path_metadata) == 48
     assert all(
         POLICY_PATH_IDS[str(row["scenario_id"])] == str(row["path_id"])
         for _, row in path_metadata.iterrows()

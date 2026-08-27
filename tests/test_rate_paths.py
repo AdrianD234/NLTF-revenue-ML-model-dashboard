@@ -164,6 +164,7 @@ def test_rate_paths_frame_has_three_streams_on_a_per_1000km_basis(pack_chart_row
         "option1_12c_10c_4c",
         "option2_9c_9c_4c",
         "option3_4c_semiannual",
+        "option4_labour_4c",
     }
     for series in ("Light RUC", "Heavy RUC"):
         assert set(frame.loc[frame["series"].eq(series), "segment"]) == expected_segments

@@ -17,7 +17,7 @@ Invariants asserted for each combination:
   * the selected sensitivity/uptake/e-RUC effect does not disappear when a
     deferral is chosen;
   * identical configurations return identical frames;
-  * all 121 Current x official key digests are unique.
+  * all 144 Current x official key digests are unique.
 """
 from __future__ import annotations
 
@@ -319,11 +319,11 @@ def test_identical_configurations_produce_identical_paths(outlook) -> None:
     pd.testing.assert_frame_equal(first, second, check_exact=True)
 
 
-def test_all_one_hundred_twenty_one_policy_key_digests_are_unique(outlook) -> None:
+def test_full_policy_key_digest_matrix_is_unique(outlook) -> None:
     pack = outlook["pack"]
     digests = {
         governed_key(pack, ENGINE_AR1, current.state_id, official.state_id).digest()
         for current in FED_POLICY_SPECS
         for official in FED_POLICY_SPECS
     }
-    assert len(digests) == 121
+    assert len(digests) == 144
