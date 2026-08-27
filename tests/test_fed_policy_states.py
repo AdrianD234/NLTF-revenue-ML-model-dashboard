@@ -341,6 +341,67 @@ def test_official_staircase_escalates_four_cents_every_year(quarterly) -> None:
     assert rate("delayed_6m", "2050Q4") == pytest.approx(1.76024)
 
 
+def test_no_uplift_keeps_the_six_cent_step_and_annual_staircase(quarterly) -> None:
+    """The no-uplift state is "no 12c, everything else on schedule": flat at
+    the pre-staircase base through calendar 2027 (no step at 2027Q1 at all),
+    the legislated +6c/L on 1 Jan 2028, then +4c/L at EVERY later 1 January
+    through the horizon - exactly 12c below published everywhere from 2027Q1.
+    This is the regression contract behind the reader-facing dropdown label
+    "No 12c uplift — 6c from 1 Jan 2028, then +4c/L annually"."""
+    no_uplift = pd.to_numeric(quarterly["no_uplift"], errors="coerce")
+    planned = pd.to_numeric(quarterly["planned"], errors="coerce")
+
+    # 2027: no 12c step - the rate holds the pre-staircase base all year.
+    for quarter in ("2026Q4", "2027Q1", "2027Q2", "2027Q3", "2027Q4"):
+        assert float(no_uplift.at[quarter]) == pytest.approx(0.70024), quarter
+    # 1 Jan 2028: the separately legislated +6c/L applies on schedule.
+    assert float(no_uplift.at["2028Q1"]) == pytest.approx(0.76024)
+    assert float(no_uplift.at["2028Q4"]) == pytest.approx(0.76024)
+    # 1 Jan 2029 onward: the +4c/L annual staircase, through the horizon.
+    assert float(no_uplift.at["2029Q1"]) == pytest.approx(0.80024)
+    assert float(no_uplift.at["2030Q1"]) == pytest.approx(0.84024)
+    assert float(no_uplift.at["2031Q1"]) == pytest.approx(0.88024)
+    assert float(no_uplift.at["2032Q1"]) == pytest.approx(0.92024)
+    assert float(no_uplift.at["2038Q1"]) == pytest.approx(1.16024)
+    assert float(no_uplift.at["2045Q1"]) == pytest.approx(1.44024)
+    assert float(no_uplift.at["2050Q1"]) == pytest.approx(1.64024)
+    assert float(no_uplift.at["2050Q4"]) == pytest.approx(1.64024)
+
+    # Step structure from 2026Q1: the FIRST step is the +6c at 2028Q1, every
+    # later step is exactly +4c, and steps land on 1 January only.
+    steps: list[tuple[str, float]] = []
+    previous = None
+    for quarter in quarterly.index:
+        value = no_uplift.at[quarter]
+        if pd.isna(value):
+            continue
+        if quarter_serial(str(quarter)) < quarter_serial("2026Q1"):
+            previous = float(value)
+            continue
+        if previous is not None and abs(float(value) - previous) > 1e-9:
+            steps.append((str(quarter), round(float(value) - previous, 5)))
+        previous = float(value)
+    assert steps[0] == ("2028Q1", pytest.approx(0.06))
+    assert all(size == pytest.approx(0.04) for _, size in steps[1:])
+    assert all(quarter.endswith("Q1") for quarter, _ in steps)
+    assert [quarter for quarter, _ in steps[1:]] == [
+        f"{year}Q1" for year in range(2029, 2051)
+    ]
+
+    # Exactly the published path minus the 12c wedge from 2027Q1 onward.
+    from_uplift = [
+        quarter
+        for quarter in quarterly.index
+        if quarter_serial(str(quarter)) >= quarter_serial(FED_UPLIFT_START_PERIOD)
+        and pd.notna(planned.at[quarter])
+        and pd.notna(no_uplift.at[quarter])
+    ]
+    for quarter in from_uplift:
+        assert float(planned.at[quarter]) - float(no_uplift.at[quarter]) == pytest.approx(
+            0.12
+        ), quarter
+
+
 def test_every_scheduled_step_moves_by_exactly_the_stated_duration(quarterly) -> None:
     """Step-for-step: a shift state's step quarters are the planned step
     quarters moved by delay_quarters, with identical step sizes in order."""

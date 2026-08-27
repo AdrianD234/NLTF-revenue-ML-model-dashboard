@@ -1751,7 +1751,10 @@ def test_revenue_outlook_policy_duration_selector_updates_the_chart(page: Page) 
     # No uplift: FY2030 drops below the 36-month deferral (which has caught
     # up by 1 January 2030 and collects the uplift for half of FY2030).
     deferred_36m_fy2030 = trace_value(medium_trace, "FY2030")
-    select_policy("No 12c uplift", r"No 12c uplift")
+    select_policy(
+        "No 12c uplift — 6c from 1 Jan 2028, then +4c/L annually",
+        r"No 12c uplift",
+    )
     wait_for_trace_move("FY2030", deferred_36m_fy2030)
     assert trace_value(medium_trace, "FY2030") < deferred_36m_fy2030
     assert page.locator("[data-testid='stException']").count() == 0

@@ -1009,6 +1009,17 @@ _OFFICIAL_POLICY_STATE_BY_UI_LABEL = {
     spec.state_id: spec.calculation_state_id for spec in FED_POLICY_SPECS
 }
 FED_POLICY_LABELS = {spec.state_id: spec.label for spec in FED_POLICY_SPECS}
+# Reader-facing clarification ONLY, applied at the presentation layer: the
+# no-uplift state removes just the initial 12c/L step - the legislated +6c/L
+# (1 Jan 2028) and every ongoing +4c/L annual step still apply - and the
+# dropdown should say so. The registry label, state ids, calculations and
+# every governed output are untouched (the registry label also feeds audit
+# frames inside governed packs, so it must not change for a wording fix).
+# The "No 12c uplift" prefix is load-bearing: e2e tests and readers match on
+# it, so extend it rather than replacing it.
+FED_POLICY_LABELS[FED_POLICY_OFF] = (
+    "No 12c uplift — 6c from 1 Jan 2028, then +4c/L annually"
+)
 FED_POLICY_NOTES = {
     FED_POLICY_PUBLISHED: (
         "Original published timing: the 12c/L step begins 1 January 2027. "
@@ -1039,6 +1050,11 @@ def _normalise_fed_policy_state(value: Any) -> str:
     text = str(value or "").strip()
     lowered = text.casefold()
     label_lookup = {label.casefold(): state for state, label in FED_POLICY_LABELS.items()}
+    # Registry labels stay accepted spellings even where the displayed label
+    # is overridden (the no-uplift wording), so any stored pre-override
+    # selection still resolves to its state instead of the default.
+    for spec in FED_POLICY_SPECS:
+        label_lookup.setdefault(spec.label.casefold(), spec.state_id)
     if lowered in label_lookup:
         return label_lookup[lowered]
     aliases = fed_policy_state_aliases()

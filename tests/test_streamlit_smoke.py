@@ -1285,6 +1285,37 @@ def test_revenue_outlook_defaults_to_single_scenario_view() -> None:
     assert "Advanced scenario levers" in expander_labels
 
 
+def test_no_uplift_dropdown_label_is_presentation_only() -> None:
+    """The clarified no-uplift wording is a display-layer override ONLY.
+
+    The dropdown names what the state keeps (the 6c step from 1 Jan 2028 and
+    the +4c/L annual staircase), while the governed registry label, state ids
+    and every calculation input stay byte-identical - the registry label also
+    feeds audit frames inside governed packs, so it must not move for a
+    wording fix. The schedule itself is pinned by
+    test_no_uplift_keeps_the_six_cent_step_and_annual_staircase.
+    """
+    from model_dashboard.fed_policy_states import policy_spec
+
+    shown = app.FED_POLICY_LABELS[app.FED_POLICY_OFF]
+    assert shown == "No 12c uplift — 6c from 1 Jan 2028, then +4c/L annually"
+    # e2e selectors and readers match on this prefix; extend it, never drop it.
+    assert shown.startswith("No 12c uplift")
+    spec = policy_spec(app.FED_POLICY_OFF)
+    assert spec.label == "No 12c uplift"
+    assert spec.state_id == "off"
+    assert spec.calculation_state_id == "no_uplift"
+    # Every other state shows its registry label verbatim.
+    for state, label in app.FED_POLICY_LABELS.items():
+        if state != app.FED_POLICY_OFF:
+            assert label == policy_spec(state).label, state
+    # Both the new display label and the retained registry label resolve to
+    # the same state, so stored pre-override selections cannot silently fall
+    # back to the default.
+    assert app._normalise_fed_policy_state(shown) == app.FED_POLICY_OFF
+    assert app._normalise_fed_policy_state("No 12c uplift") == app.FED_POLICY_OFF
+
+
 def test_revenue_outlook_renders_every_governed_policy_duration() -> None:
     """The eight-state Current 12c dropdown, exercised end to end.
 
@@ -1301,6 +1332,10 @@ def test_revenue_outlook_renders_every_governed_policy_duration() -> None:
     # AppTest exposes the FORMATTED labels as options; values are the ids.
     assert tuple(policy.options) == tuple(
         app.FED_POLICY_LABELS[state] for state in app.FED_POLICY_OPTIONS
+    )
+    assert (
+        "No 12c uplift — 6c from 1 Jan 2028, then +4c/L annually"
+        in policy.options
     )
     assert len(policy.options) == 8
     # Preserved production default: the six-month deferral.
