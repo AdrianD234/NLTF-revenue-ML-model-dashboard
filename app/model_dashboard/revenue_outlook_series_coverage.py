@@ -1172,7 +1172,7 @@ def _actual_quarter_lookup(
     return lookup
 
 
-# The eight governed 12c policy states, mapped onto the columns
+# The twelve governed 12c policy states, mapped onto the columns
 # ``rate_paths.ped_quarterly_rate_schedules`` already publishes. The schedule
 # is NOT duplicated here - this is a column selection over the one governed
 # source (derived from the canonical registry), so a change to the timetable
@@ -1209,7 +1209,7 @@ def normalise_quarterly_rate_policy_state(value: Any) -> str:
         raise SeriesCoverageError(str(error)) from error
 
 
-@lru_cache(maxsize=8)
+@lru_cache(maxsize=16)
 def _ped_rate_by_quarter(root_text: str, policy_state: str) -> tuple[tuple[str, float], ...]:
     """The governed PED $/L for one policy state, by calendar quarter.
 

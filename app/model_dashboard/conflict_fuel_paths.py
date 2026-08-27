@@ -157,9 +157,9 @@ class PolicyVariantSpec:
 
 
 # Derived from the canonical registry: one variant per non-published governed
-# state (the six finite deferrals plus no-uplift), in display order. The
-# six-month and no-uplift entries retain their historic ids, suffixes and
-# display names exactly.
+# state (the six finite deferrals, no-uplift, then the four bespoke rate
+# paths), in display order. The six-month and no-uplift entries retain their
+# historic ids, suffixes and display names exactly.
 POLICY_VARIANT_REGISTRY: Mapping[str, PolicyVariantSpec] = MappingProxyType(
     {
         spec.calculation_state_id: PolicyVariantSpec(
@@ -302,8 +302,9 @@ def conflict_policy_variant_name(severity: Any, policy_variant: str) -> str:
 def all_conflict_policy_variants() -> tuple[ConflictPolicyVariant, ...]:
     """Every Low/Medium/High by non-published-policy combination.
 
-    Registry-driven: three severities crossed with the six finite deferrals
-    plus no-uplift (21 variants).
+    Registry-driven: three severities crossed with the eleven non-published
+    states (six finite deferrals, no-uplift, four bespoke rate paths;
+    33 variants).
     """
 
     return tuple(
