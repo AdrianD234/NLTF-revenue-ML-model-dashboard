@@ -28,9 +28,10 @@
     "long_run_shape_vintage_id": "PREBU26",
     "long_run_transition_schedule_id": "growth_handover_fy2035",
     "macro_scenario_id": "",
-    "conflict_fuel_state": ""
+    "conflict_fuel_state": "",
+    "fed_ruc_transition": "off"
   },
-  "scenario_key_digest": "ef515f6636e1730d0fbc1ccbc0affed557460e65b7e32c5ed3ee4866623aa446",
+  "scenario_key_digest": "30343ea0dc184c40067d200809d0fb5d6ba83f5b8baadb2febee2530c90641d6",
   "formula_tolerance": 1e-06,
   "series_count": 40,
   "fy_range": [
@@ -43,9 +44,9 @@
     "central_path": "data/current_revenue_outlook (line reconciliation, current_basecase)"
   },
   "builder_version": "2",
-  "source_main_sha": "bf72f784a9e5c29a79e6f7f49f9dbc2381f5f1e6",
+  "source_main_sha": "36c474ad69a841467584ae2de03a8a40ea79f811",
   "output_hashes": {
-    "uncertainty_band_rows.parquet": "00af75519a60e378253582cbdcae4715c28c632e121e0e3ae9705ad903a35b46",
+    "uncertainty_band_rows.parquet": "30a1f9109f6fccf97aa59dc3f63caf6ff9ae40eae41bb1bc5bf9eb9f9fb5447f",
     "june_year_basis.parquet": "3c12c24ebafd05de9c0375b9adbd909530238aa4874152dc25679be54a17ef2a"
   }
 }
