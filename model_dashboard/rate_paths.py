@@ -277,10 +277,10 @@ def ped_quarterly_rate_schedules(repo_root: Path) -> pd.DataFrame:
     pre-uplift base from the uplift start until its own first step (no
     legislated increase ever occurs on a bespoke path), then accumulates its
     explicit ex-GST steps on that base through the schedule horizon. A
-    bespoke path may rejoin the published staircase (Option 1 at 2029Q1),
-    cross above it (Option 3 at roughly 2031Q3), or hold a constant mature
-    wedge below it (Option 4: 22c/L from 2030Q1); no below-published or
-    duration-ordering constraint applies to them.
+    bespoke path may rejoin the published staircase (Option 1 at 2029Q1) or
+    hold a constant mature wedge below it (Option 3: 6c/L from 2028Q3 after
+    its temporary six-monthly steps; Option 4: 22c/L from 2030Q1); no
+    below-published or duration-ordering constraint applies to them.
     """
     fed = _fed_rate_paths(repo_root)
     pivot = fed.pivot_table(
@@ -1487,10 +1487,11 @@ def official_comparator_policy_factors(
     window runs to the schedule horizon, because the official +4c/L annual
     step keeps the shifted path persistently below published timing.
 
-    bespoke step paths (``option1_…`` … ``option3_…``): the same
+    bespoke step paths (``option1_…`` … ``option4_…``): the same
     selected/planned annual rate ratio over their schedule-derived affected
-    window. Unlike a deferral the ratio is not bounded by one - Option 3
-    crosses above the published staircase and its later factors exceed 1.0.
+    window. Unlike a deferral the ratio is not bounded by one by contract -
+    a bespoke path carries no fixed side of published timing, so no
+    below-one assumption may be applied to these factors.
 
     Fails closed for a June year whose official published PED rate cannot be
     derived: the policy-adjusted official trace must never silently fall back
