@@ -1,7 +1,8 @@
-"""Registry, schedule and factor gates for the governed 12c deferral states.
+"""Registry, schedule and factor gates for the governed 12c policy states.
 
 Covers the acceptance tests the deferral-duration handoff names:
-  * exactly eight canonical states, six finite deferrals, quarters {2,4,...,12};
+  * exactly eleven canonical states: published, six finite deferrals
+    (quarters {2,4,...,12}), no-uplift, and three bespoke rate paths;
   * unique IDs, labels, display order and start periods;
   * the exact deferred start quarters;
   * legacy aliases resolve; unknown states fail closed everywhere;
@@ -9,7 +10,11 @@ Covers the acceptance tests the deferral-duration handoff names:
     (including catch-up coinciding with another scheduled increase);
   * quarterly and annual factor exactness;
   * the generic six-month state equals the legacy six-month wrappers within
-    one process (environment-independent equivalence gate).
+    one process (environment-independent equivalence gate);
+  * the bespoke Options 1-3: exact quarterly pins, FY2027 identity with the
+    no-uplift path, Option 1's published rejoin, Option 2's 12-month-shift
+    equivalence from 2029Q1, and Option 3's semiannual staircase crossing
+    above published at 2031Q3.
 """
 from __future__ import annotations
 
@@ -24,6 +29,7 @@ from model_dashboard.fed_policy_states import (
     FED_POLICY_SPECS,
     FED_UPLIFT_START_PERIOD,
     PolicyStateError,
+    bespoke_specs,
     calculation_state_ids,
     finite_deferral_specs,
     policy_spec,
@@ -44,6 +50,9 @@ EXPECTED_STATE_IDS = (
     "delayed_30m",
     "delayed_36m",
     "off",
+    "option1_12c_10c_4c",
+    "option2_9c_9c_4c",
+    "option3_4c_semiannual",
 )
 EXPECTED_CALC_IDS = (
     "published",
@@ -54,6 +63,9 @@ EXPECTED_CALC_IDS = (
     "delay_30m",
     "delay_36m",
     "no_uplift",
+    "option1_12c_10c_4c",
+    "option2_9c_9c_4c",
+    "option3_4c_semiannual",
 )
 EXPECTED_STARTS = ("2027Q3", "2028Q1", "2028Q3", "2029Q1", "2029Q3", "2030Q1")
 EXPECTED_LABELS = (
@@ -64,8 +76,12 @@ EXPECTED_LABELS = (
     "Deferred 2.0 years (24 months) — 1 Jan 2029",
     "Deferred 2.5 years (30 months) — 1 Jul 2029",
     "Deferred 3.0 years (36 months) — 1 Jan 2030",
-    "No 12c uplift",
+    "No 12c uplift — 6c from 1 Jan 2028, then +4c/L annually",
+    "Option 1 — 12c on 1 Jan 2028, 10c on 1 Jan 2029, then +4c annually",
+    "Option 2 — 9c on 1 Jan 2028, 9c on 1 Jan 2029, then +4c annually",
+    "Option 3 — +4c every six months from 1 Jan 2028",
 )
+BESPOKE_STATE_IDS = EXPECTED_STATE_IDS[8:]
 # Direct rate-affected calendar-quarter windows per finite deferral. The
 # six-month state changes only its initial window (catch-up); every longer
 # state shifts the ENTIRE staircase. Because the official staircase adds
@@ -98,11 +114,11 @@ NO_UPLIFT_BY_YEAR = {2027: 0.70024, 2028: 0.76024, 2029: 0.80024, 2030: 0.84024}
 # --------------------------------------------------------------- A. registry
 
 
-def test_registry_has_exactly_eight_states_in_display_order() -> None:
+def test_registry_has_exactly_eleven_states_in_display_order() -> None:
     assert policy_state_ids() == EXPECTED_STATE_IDS
     assert calculation_state_ids() == EXPECTED_CALC_IDS
     assert tuple(spec.label for spec in FED_POLICY_SPECS) == EXPECTED_LABELS
-    assert tuple(spec.display_order for spec in FED_POLICY_SPECS) == tuple(range(8))
+    assert tuple(spec.display_order for spec in FED_POLICY_SPECS) == tuple(range(11))
 
 
 def test_registry_has_exactly_six_finite_deferrals() -> None:
@@ -594,3 +610,188 @@ def test_official_cumulative_rate_only_revenue_is_ordered_by_duration() -> None:
     ordered = [cumulative[spec.state_id] for spec in finite_deferral_specs()]
     assert ordered == sorted(ordered)
     assert ordered[0] > 0.0
+
+
+# ------------------------------------------------------ E. bespoke rate paths
+
+# The consultant's hard numerical pins: r0 = 0.70024 (the governed pre-uplift
+# base immediately before 2028Q1), every amount an incremental ex-GST NZD/L
+# increase. Columns: Option 1, Option 2, Option 3.
+BESPOKE_PIN_TABLE = {
+    "2027Q4": (0.70024, 0.70024, 0.70024),
+    "2028Q1": (0.82024, 0.79024, 0.74024),
+    "2028Q3": (0.82024, 0.79024, 0.78024),
+    "2029Q1": (0.92024, 0.88024, 0.82024),
+    "2029Q3": (0.92024, 0.88024, 0.86024),
+    "2030Q1": (0.96024, 0.92024, 0.90024),
+    "2030Q3": (0.96024, 0.92024, 0.94024),
+    "2031Q1": (1.00024, 0.96024, 0.98024),
+    "2031Q3": (1.00024, 0.96024, 1.02024),
+}
+BESPOKE_COLUMNS = ("option1_12c_10c_4c", "option2_9c_9c_4c", "option3_4c_semiannual")
+
+
+def test_bespoke_registry_metadata_is_explicit() -> None:
+    specs = bespoke_specs()
+    assert tuple(spec.state_id for spec in specs) == BESPOKE_STATE_IDS
+    for spec in specs:
+        assert spec.is_bespoke
+        assert spec.schedule_kind == "bespoke_steps"
+        assert not spec.is_finite_deferral
+        assert not spec.is_staircase_shift
+        assert spec.schedule_column == spec.state_id
+        assert spec.pair_state_suffix == spec.state_id
+        assert spec.path_suffix == spec.state_id
+        assert spec.timing_id == spec.state_id
+        assert spec.timing_label == spec.label
+        assert spec.start_period == "2028Q1"
+        assert spec.start_date_text == "1 Jan 2028"
+        with pytest.raises(PolicyStateError):
+            spec.direct_affected_quarters()
+    # Deferral vocabulary is untouched: bespoke states never enter it.
+    assert all(not spec.is_bespoke for spec in finite_deferral_specs())
+    assert policy_spec("option3_4c_semiannual").short_policy_phrase == "Option 3"
+
+
+def test_superseded_no_uplift_label_spellings_still_resolve() -> None:
+    aliases = policy_state_aliases()
+    assert aliases["no 12c uplift"] == "off"
+    assert policy_spec("No 12c uplift").state_id == "off"
+    assert policy_spec("No 12c uplift — 6c from 1 Jan 2028, then +4c/L annually").state_id == "off"
+
+
+def test_bespoke_quarterly_pins(quarterly) -> None:
+    """Every pinned quarterly value from the consultant's acceptance table."""
+    for quarter, expected in BESPOKE_PIN_TABLE.items():
+        for column, value in zip(BESPOKE_COLUMNS, expected):
+            assert float(pd.to_numeric(quarterly.at[quarter, column])) == pytest.approx(
+                value, abs=1e-12
+            ), (column, quarter)
+
+
+def test_bespoke_paths_identical_through_fy2027(quarterly) -> None:
+    """All three options equal each other AND the no-uplift path before their
+    first step: the 2027 12c uplift never occurs on any of them."""
+    no_uplift = pd.to_numeric(quarterly["no_uplift"], errors="coerce")
+    first_step = quarter_serial("2028Q1")
+    for column in BESPOKE_COLUMNS:
+        target = pd.to_numeric(quarterly[column], errors="coerce")
+        for quarter in quarterly.index:
+            if quarter_serial(str(quarter)) >= first_step:
+                continue
+            if pd.isna(no_uplift.at[quarter]):
+                assert pd.isna(target.at[quarter]), (column, quarter)
+                continue
+            assert float(target.at[quarter]) == float(no_uplift.at[quarter]), (
+                column,
+                quarter,
+            )
+
+
+def test_option1_rejoins_published_at_2029q1(quarterly) -> None:
+    """Option 1 reaches the published rate level at 2029Q1 and follows the
+    published staircase thereafter, so direct rate deltas close there."""
+    planned = pd.to_numeric(quarterly["planned"], errors="coerce")
+    option1 = pd.to_numeric(quarterly["option1_12c_10c_4c"], errors="coerce")
+    rejoin = quarter_serial("2029Q1")
+    for quarter in quarterly.index:
+        serial = quarter_serial(str(quarter))
+        if serial < rejoin or pd.isna(planned.at[quarter]):
+            continue
+        # Bit-identical, not merely close: a 1-ULP gap would make the
+        # selected/planned factor 1+2e-16 and trip the replay's strict
+        # economic sign invariant on the rejoined quarters.
+        assert float(option1.at[quarter]) == float(planned.at[quarter]), quarter
+    # And the affected-period map closes at the FY2029 boundary.
+    affected = rate_paths.fed_policy_affected_periods(ROOT, "option1_12c_10c_4c")
+    assert sorted(affected) == [2027, 2028, 2029]
+    assert affected[2029] == ("2028Q3", "2028Q4")
+
+
+def test_option2_matches_12m_shift_from_2029q1_and_sits_3c_lower_in_2028(quarterly) -> None:
+    option2 = pd.to_numeric(quarterly["option2_9c_9c_4c"], errors="coerce")
+    shifted_12m = pd.to_numeric(quarterly["delayed_12m"], errors="coerce")
+    boundary = quarter_serial("2029Q1")
+    for quarter in quarterly.index:
+        serial = quarter_serial(str(quarter))
+        if pd.isna(shifted_12m.at[quarter]):
+            continue
+        if serial >= boundary:
+            assert float(option2.at[quarter]) == pytest.approx(
+                float(shifted_12m.at[quarter]), abs=1e-12
+            ), quarter
+        elif quarter_serial("2028Q1") <= serial <= quarter_serial("2028Q4"):
+            assert float(shifted_12m.at[quarter]) - float(option2.at[quarter]) == pytest.approx(
+                0.03, abs=1e-12
+            ), quarter
+
+
+def test_option3_steps_semiannually_and_crosses_published(quarterly) -> None:
+    """Option 3 steps +4c at every Q1 and Q3 only, from 2028Q1 through the
+    horizon; it crosses above published at 2031Q3 and keeps diverging."""
+    planned = pd.to_numeric(quarterly["planned"], errors="coerce")
+    option3 = pd.to_numeric(quarterly["option3_4c_semiannual"], errors="coerce")
+    steps: list[tuple[str, float]] = []
+    previous = None
+    for quarter in quarterly.index:
+        value = option3.at[quarter]
+        if pd.isna(value):
+            continue
+        if quarter_serial(str(quarter)) < quarter_serial("2026Q1"):
+            previous = float(value)
+            continue
+        if previous is not None and abs(float(value) - previous) > 1e-9:
+            steps.append((str(quarter), round(float(value) - previous, 5)))
+        previous = float(value)
+    assert steps[0] == ("2028Q1", pytest.approx(0.04))
+    assert steps[-1][0] == rate_paths.FED_SCHEDULE_HORIZON_END_PERIOD.replace("Q4", "Q3")
+    for quarter, size in steps:
+        assert size == pytest.approx(0.04), quarter
+        assert quarter.endswith(("Q1", "Q3")), quarter
+    expected_serials = list(
+        range(quarter_serial("2028Q1"), quarter_serial("2050Q4") + 1, 2)
+    )
+    assert [quarter_serial(quarter) for quarter, _ in steps] == expected_serials
+    # Crossing: below-or-equal published before 2031Q3, strictly above from it.
+    crossing = quarter_serial("2031Q3")
+    for quarter in quarterly.index:
+        serial = quarter_serial(str(quarter))
+        if serial < quarter_serial("2028Q1") or pd.isna(planned.at[quarter]):
+            continue
+        if serial < crossing:
+            assert float(option3.at[quarter]) <= float(planned.at[quarter]) + 1e-12, quarter
+        else:
+            assert float(option3.at[quarter]) > float(planned.at[quarter]) + 1e-12, quarter
+    assert float(option3.at["2050Q4"]) == pytest.approx(2.54024)
+
+
+def test_bespoke_quarterly_factors_are_exact_ratios(quarterly) -> None:
+    planned = pd.to_numeric(quarterly["planned"], errors="coerce")
+    for spec in bespoke_specs():
+        factors = rate_paths.fed_policy_quarterly_factors(ROOT, spec.calculation_state_id)
+        target = pd.to_numeric(quarterly[spec.schedule_column], errors="coerce")
+        for quarter in quarterly.index:
+            if pd.isna(planned.at[quarter]) or pd.isna(target.at[quarter]):
+                continue
+            assert factors[str(quarter)] == float(target.at[quarter]) / float(
+                planned.at[quarter]
+            ), (spec.state_id, quarter)
+    option3 = rate_paths.fed_policy_quarterly_factors(ROOT, "option3_4c_semiannual")
+    assert option3["2027Q1"] == pytest.approx(0.70024 / 0.82024, rel=1e-15)
+    assert option3["2031Q1"] < 1.0
+    assert option3["2031Q3"] > 1.0  # the crossing is visible in the factor map
+
+
+def test_official_comparator_factors_for_every_bespoke_state() -> None:
+    for spec in bespoke_specs():
+        frame = rate_paths.official_comparator_policy_factors(ROOT, spec.calculation_state_id)
+        affected = rate_paths.fed_policy_affected_periods(ROOT, spec.calculation_state_id)
+        assert set(frame["june_year"].astype(int)) <= set(affected)
+        assert not frame.empty
+        assert (frame["target_rate_nzd_per_litre"] > 0).all()
+        assert frame["policy_state"].eq(spec.calculation_state_id).all()
+        # Within the MBU26 horizon every bespoke option sits below published
+        # (Option 3's crossing lies beyond it), so the factors stay below one
+        # here - but no below-published bound is part of the contract.
+        fy2027 = frame[frame["june_year"].astype(int).eq(2027)]
+        assert not fy2027.empty and (fy2027["factor"] < 1.0).all()

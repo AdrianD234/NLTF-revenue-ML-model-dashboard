@@ -973,8 +973,9 @@ def net_revenue_timing_comparison_frame(
             for level in CONFLICT_FUEL_SCENARIO_LEVELS
         ),
     )
-    # Registry-driven: all eight governed timing states per family, in
-    # display order (published, the six finite deferrals, no uplift).
+    # Registry-driven: all eleven governed timing states per family, in
+    # display order (published, the six finite deferrals, no uplift, then
+    # the three bespoke rate paths).
     timing_specs = tuple(
         (spec.timing_id, spec.calculation_state_id, spec.timing_label, spec)
         for spec in FED_POLICY_SPECS
@@ -1235,6 +1236,42 @@ def net_revenue_timing_comparison_frame(
                 raise ValueError(
                     f"The deferred 12c path ({spec.timing_id}) must exceed no-uplift for "
                     "every rejoined Net FED and Net RUC year."
+                )
+    # Bespoke rate paths: neither deferral rule applies, and no
+    # below-published or duration-ordering bound holds (Option 3 crosses
+    # above published timing). The invariants here are the shape-agnostic
+    # ones every bespoke path shares; exact rejoin/equivalence/crossing
+    # values are pinned by the schedule-level tests, which can consult the
+    # governed rate schedules this validator deliberately does not load.
+    bespoke = [spec for spec in FED_POLICY_SPECS if spec.is_bespoke]
+    for spec in bespoke:
+        path = timing[spec.timing_id]
+        published_delta = timing["published"] - path
+        off_delta = path - timing["no_uplift"]
+        if not np.allclose(published_delta[mvr], 0.0, rtol=0.0, atol=1e-9) or not np.allclose(
+            off_delta[mvr], 0.0, rtol=0.0, atol=1e-9
+        ):
+            raise ValueError("A bespoke FED/RUC rate path must not change Net MVR.")
+        if not np.allclose(published_delta[fy2026], 0.0, rtol=0.0, atol=1e-9):
+            raise ValueError(
+                f"Original and bespoke ({spec.timing_id}) states must be identical in FY2026."
+            )
+        # Every bespoke path skips the 2027 uplift entirely, so through
+        # FY2027 it prices exactly like the no-uplift path (which also makes
+        # all bespoke paths mutually identical there) and sits below
+        # published timing for the tax series.
+        through_fy2027 = timing_fy <= 2027
+        if not np.allclose(off_delta[through_fy2027], 0.0, rtol=0.0, atol=1e-9):
+            raise ValueError(
+                f"The bespoke path ({spec.timing_id}) must match the no-uplift "
+                "path through FY2027: its schedule begins at 1 Jan 2028."
+            )
+        if int(start_fy) <= 2027 <= int(end_fy):
+            fy2027_tax = (timing_fy == 2027) & tax_series
+            if not published_delta[fy2027_tax].gt(0.0).all():
+                raise ValueError(
+                    f"Original timing must exceed the bespoke path ({spec.timing_id}) "
+                    "for FY2027 Net FED and Net RUC."
                 )
     if 2027 in delayed_factors and not (0.0 < float(delayed_factors[2027]) < 1.0):
         raise ValueError("The governed FY2027 delayed-rate factor must lie between zero and one.")

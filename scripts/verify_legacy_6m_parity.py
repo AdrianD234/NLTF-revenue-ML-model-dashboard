@@ -400,7 +400,7 @@ def main() -> int:
                 )
                 results.append({
                     "frame": f"{prefix}timing_comparison_row_count",
-                    "status": "PASS" if len(comparison) == 480 else "FAIL",
+                    "status": "PASS" if len(comparison) == 660 else "FAIL",
                     "detail": f"rows={len(comparison)}",
                 })
 

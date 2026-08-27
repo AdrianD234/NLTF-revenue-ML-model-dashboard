@@ -227,10 +227,11 @@ def test_scenario_and_policy_variant_helpers_are_stable() -> None:
         load_conflict_fuel_paths(CSV_PATH)
     )
 
-    # Three severities crossed with the six finite deferrals plus no-uplift.
+    # Three severities crossed with the ten non-published states (six finite
+    # deferrals, no-uplift, three bespoke rate paths).
     variants = all_conflict_policy_variants()
-    assert len(variants) == 21
-    assert len({variant.scenario_id for variant in variants}) == 21
+    assert len(variants) == 30
+    assert len({variant.scenario_id for variant in variants}) == 30
     assert {variant.policy_variant for variant in variants} == {
         "delay_6m",
         "delay_12m",
@@ -239,7 +240,16 @@ def test_scenario_and_policy_variant_helpers_are_stable() -> None:
         "delay_30m",
         "delay_36m",
         "no_uplift",
+        "option1_12c_10c_4c",
+        "option2_9c_9c_4c",
+        "option3_4c_semiannual",
     }
+    low_option1 = conflict_policy_variant("low", "option1_12c_10c_4c")
+    assert low_option1.scenario_id == "middle_east_low__option1_12c_10c_4c"
+    assert low_option1.display_name == (
+        "Current conditions baseline - "
+        "Option 1 — 12c on 1 Jan 2028, 10c on 1 Jan 2029, then +4c annually"
+    )
     low_delay_12m = conflict_policy_variant("low", "delayed_12m")
     assert low_delay_12m.scenario_id == "middle_east_low__12c_delay_12m"
     assert low_delay_12m.display_name == (

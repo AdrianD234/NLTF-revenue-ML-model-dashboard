@@ -5,7 +5,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from model_dashboard.fed_policy_states import finite_deferral_specs
+from model_dashboard.fed_policy_states import bespoke_specs, finite_deferral_specs
 from model_dashboard.light_fleet_allocation import LAST_DECISION_GRADE_ANNUAL_FY
 from model_dashboard.series_inventory_contract import LAST_POST_MODEL_FY
 from model_dashboard.rate_paths import (
@@ -145,11 +145,12 @@ def test_rate_paths_frame_has_three_streams_on_a_per_1000km_basis(pack_chart_row
     frame = rate_paths_frame(ROOT, pack_chart_rows)
     assert set(frame["series"]) == {"Light RUC", "Heavy RUC", "PED (petrol excise)"}
     # Every governed policy segment, from the canonical registry: planned,
-    # the six finite deferrals, and no-uplift.
+    # the six finite deferrals, no-uplift, and the three bespoke rate paths.
     expected_segments = {
         "planned",
         *(spec.schedule_column for spec in finite_deferral_specs()),
         "no_uplift",
+        *(spec.schedule_column for spec in bespoke_specs()),
     }
     assert expected_segments == {
         "planned",
@@ -160,6 +161,9 @@ def test_rate_paths_frame_has_three_streams_on_a_per_1000km_basis(pack_chart_row
         "delayed_30m",
         "delayed_36m",
         "no_uplift",
+        "option1_12c_10c_4c",
+        "option2_9c_9c_4c",
+        "option3_4c_semiannual",
     }
     for series in ("Light RUC", "Heavy RUC"):
         assert set(frame.loc[frame["series"].eq(series), "segment"]) == expected_segments

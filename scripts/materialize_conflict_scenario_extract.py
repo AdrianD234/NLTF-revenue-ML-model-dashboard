@@ -80,10 +80,11 @@ from model_dashboard.revenue_outlook import (
 
 START_FY = 2026
 END_FY = 2030
-# v4: the timing dimension expanded from three states (original, deferred six
-# months, off) to eight (original, 6-36 month deferrals in six-month steps,
-# off); 32 paths in total. Values on the original twelve paths are unchanged.
-EXTRACT_VERSION = "governed-ar1-conflict-scenario-extract-v4"
+# v5: the timing dimension expanded from eight states to eleven, adding the
+# three bespoke rate paths (Options 1-3: no 12c in 2027 then their own ex-GST
+# steps from 1 Jan 2028); 44 paths in total. Values on the original 32 paths
+# are unchanged apart from the clarified no-uplift policy label.
+EXTRACT_VERSION = "governed-ar1-conflict-scenario-extract-v5"
 ASSUMPTIONS_FILENAME = "conflict_scenario_assumptions.csv"
 REVENUE_FILENAME = "conflict_scenario_annual_revenue.csv"
 ACTIVITY_FILENAME = "conflict_scenario_annual_activity.csv"
@@ -131,7 +132,7 @@ _SERIES_METADATA["total_fed_ruc_net_revenue"] = {
 
 @dataclass(frozen=True)
 class ExportPath:
-    """Stable metadata for one of the 32 requested export paths."""
+    """Stable metadata for one of the 44 requested export paths."""
 
     family_id: str
     family_order: int
@@ -161,7 +162,7 @@ def _scenario_id_for(family_severity: str, calculation_state_id: str) -> str:
 
 
 def _export_paths() -> tuple[ExportPath, ...]:
-    """The 32 public paths: four families crossed with eight timing states."""
+    """The 44 public paths: four families crossed with eleven timing states."""
     paths: list[ExportPath] = []
     family_specs = [
         ("base", 0, "", "Current finalist Base case"),
@@ -211,6 +212,10 @@ def _path_metadata_frame(paths: tuple[ExportPath, ...]) -> pd.DataFrame:
             direct = ";".join(spec.direct_affected_quarters())
         elif spec.is_no_uplift:
             direct = "2027Q1_onward"
+        elif spec.is_bespoke:
+            # The window depends on where the bespoke steps meet the
+            # published staircase; the exact map is schedule-derived.
+            direct = "derived_from_governed_schedule"
         else:
             direct = ""
         return {
@@ -1564,7 +1569,7 @@ def _validation_frame(
     policy_pairs_by_state: dict[str, pd.DataFrame] = {}
     original_pairs_by_state: dict[str, pd.DataFrame] = {}
     for deferral_spec in FED_POLICY_SPECS:
-        if not deferral_spec.is_finite_deferral:
+        if not (deferral_spec.is_finite_deferral or deferral_spec.is_bespoke):
             continue
         state = deferral_spec.calculation_state_id
         delayed_values = _annual_values_by_family(annual, policy_state=state)[
@@ -2067,6 +2072,163 @@ def _validation_frame(
                 "which side of off each fiscal year falls on."
             ),
         )
+
+    # Bespoke rate paths (Options 1-3): no deferral rule applies, so both
+    # orderings - against original timing AND against the no-uplift path -
+    # are dictated per fiscal year by the governed schedule's mean rates.
+    # Option 1 rejoins the published staircase (coincident outer years),
+    # Option 3 crosses above it beyond this extract's horizon; neither a
+    # never-rejoins nor an always-below bound is ever asserted here.
+    planned_fy_mean = pd.to_numeric(schedule_fy_means["planned"], errors="coerce")
+    for bespoke_state_spec in FED_POLICY_SPECS:
+        if not bespoke_state_spec.is_bespoke:
+            continue
+        state = bespoke_state_spec.calculation_state_id
+        timing = bespoke_state_spec.timing_id
+        state_policy_pairs = policy_pairs_by_state[state]
+        state_original_pairs = original_pairs_by_state[state]
+
+        shared_rows = state_policy_pairs[
+            state_policy_pairs["FY"].between(START_FY, 2027, inclusive="both")
+        ]
+        shared_error = pd.to_numeric(shared_rows["delta"], errors="coerce").abs().max()
+        add_check(
+            f"{timing}_shared_window_bespoke_off_identity",
+            passed=(
+                not state_policy_pairs["_merge"].ne("both").any()
+                and pd.notna(shared_error)
+                and float(shared_error) <= VALUE_TOLERANCE
+            ),
+            observed=(
+                f"rows={len(shared_rows)}; max_abs_delta={float(shared_error):.12g}"
+                if pd.notna(shared_error)
+                else f"rows={len(shared_rows)}; max_abs_delta=missing"
+            ),
+            expected=(
+                f"all annual {timing}/off values equal through FY2027 "
+                f"within {VALUE_TOLERANCE}"
+            ),
+            max_abs_error=float(shared_error) if pd.notna(shared_error) else None,
+            detail=(
+                f"The {timing} bespoke path skips the 2027 uplift entirely and "
+                "prices at the governed no-uplift schedule until its first step "
+                "at 1 Jan 2028, so through FY2027 it is identical to off (and "
+                "therefore to every other bespoke option)."
+            ),
+        )
+
+        state_fy2026 = state_original_pairs[state_original_pairs["FY"].eq(2026)]
+        state_fy2026_error = pd.to_numeric(state_fy2026["delta"], errors="coerce").abs().max()
+        add_check(
+            f"{timing}_fy2026_original_identity",
+            passed=(
+                state_fy2026["_merge"].eq("both").all()
+                and pd.notna(state_fy2026_error)
+                and float(state_fy2026_error) <= VALUE_TOLERANCE
+            ),
+            observed=(
+                f"rows={len(state_fy2026)}; max_abs_delta={float(state_fy2026_error):.12g}"
+                if pd.notna(state_fy2026_error)
+                else f"rows={len(state_fy2026)}; max_abs_delta=missing"
+            ),
+            expected=f"all FY2026 original/{timing} values equal within {VALUE_TOLERANCE}",
+            max_abs_error=float(state_fy2026_error) if pd.notna(state_fy2026_error) else None,
+            detail="No bespoke path changes anything before the 12c step's original January 2027 date.",
+        )
+
+        state_fy2027_tax = state_original_pairs[
+            state_original_pairs["FY"].eq(2027)
+            & state_original_pairs["series_id"].isin(
+                ["net_fed_revenue", "total_ruc_net_revenue"]
+            )
+        ]
+        state_min_fy2027 = pd.to_numeric(state_fy2027_tax["delta"], errors="coerce").min()
+        add_check(
+            f"{timing}_fy2027_original_revenue_exceeds_bespoke",
+            passed=(
+                len(state_fy2027_tax) == 4 * 2
+                and state_fy2027_tax["_merge"].eq("both").all()
+                and pd.notna(state_min_fy2027)
+                and float(state_min_fy2027) > VALUE_TOLERANCE
+            ),
+            observed=(
+                f"rows={len(state_fy2027_tax)}; "
+                f"min_original_minus_bespoke={float(state_min_fy2027):.12g}"
+                if pd.notna(state_min_fy2027)
+                else f"rows={len(state_fy2027_tax)}; min_original_minus_bespoke=missing"
+            ),
+            expected=(
+                f"8 FY2027 Net FED/Net RUC rows with original timing strictly above {timing}"
+            ),
+            max_abs_error=None,
+            detail=(
+                "Every bespoke path removes the January-June 2027 uplift from "
+                "FY2027 while original timing collects it."
+            ),
+        )
+
+        state_rate_mean = pd.to_numeric(
+            schedule_fy_means[bespoke_state_spec.schedule_column], errors="coerce"
+        )
+        for reference_name, reference_mean, reference_pairs, reference_sign in (
+            # original_pairs delta = published - bespoke, so a bespoke rate
+            # ABOVE planned must show a NEGATIVE delta: flip the sign.
+            ("original", planned_fy_mean, state_original_pairs, -1.0),
+            ("off", off_fy_mean, state_policy_pairs, 1.0),
+        ):
+            ordering_failures: list[str] = []
+            ordering_observed: list[str] = []
+            for ordering_fy in range(2028, END_FY + 1):
+                rate_gap = float(state_rate_mean.get(ordering_fy)) - float(
+                    reference_mean.get(ordering_fy)
+                )
+                fy_rows = reference_pairs[
+                    reference_pairs["FY"].eq(ordering_fy)
+                    & reference_pairs["series_id"].isin(
+                        ["net_fed_revenue", "total_ruc_net_revenue"]
+                    )
+                ]
+                deltas = pd.to_numeric(fy_rows["delta"], errors="coerce") * reference_sign
+                if len(fy_rows) != 4 * 2 or deltas.isna().any():
+                    ordering_failures.append(f"FY{ordering_fy}: incomplete rows")
+                    continue
+                if rate_gap > rate_equality_band_nzd:
+                    ok = float(deltas.min()) > VALUE_TOLERANCE
+                    regime = "above"
+                elif rate_gap < -rate_equality_band_nzd:
+                    ok = float(deltas.max()) < -VALUE_TOLERANCE
+                    regime = "below"
+                else:
+                    ok = float(deltas.abs().max()) <= replay_noise_tolerance_m
+                    regime = "coincident"
+                ordering_observed.append(
+                    f"FY{ordering_fy}:{regime}(rate_gap={rate_gap:+.3f}, "
+                    f"min={float(deltas.min()):.6g}, max={float(deltas.max()):.6g})"
+                )
+                if not ok:
+                    ordering_failures.append(f"FY{ordering_fy}: {regime} violated")
+            add_check(
+                f"{timing}_{reference_name}_ordering_follows_rate_schedule",
+                passed=(
+                    not ordering_failures
+                    and not reference_pairs["_merge"].ne("both").any()
+                ),
+                observed="; ".join(ordering_observed) or "no rows",
+                expected=(
+                    f"per-FY Net FED/Net RUC ordering against {reference_name} "
+                    "matching the governed schedule's fiscal-year mean rates "
+                    f"(equality band {rate_equality_band_nzd} $/L, noise "
+                    f"tolerance {replay_noise_tolerance_m} $m)"
+                ),
+                max_abs_error=None,
+                detail=(
+                    f"A bespoke path carries no fixed side of {reference_name}: "
+                    "Option 1 rejoins the published staircase, Option 3 crosses "
+                    "above it, and Option 3 sits below the no-uplift path during "
+                    "calendar 2028. The governed quarterly schedule is the single "
+                    "source of truth for which side each fiscal year falls on."
+                ),
+            )
 
     forecast_source = replay.future_forecasts.copy()
     calibrated_required = {

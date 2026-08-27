@@ -998,8 +998,9 @@ _MBU26_FED_UPLIFT_ROLES = ("official_comparator",)
 FED_POLICY_PUBLISHED = "published"
 FED_POLICY_DELAYED_6M = "delayed_6m"
 FED_POLICY_OFF = "off"
-# All eight governed timing states, in display order, from the canonical
-# registry: published, the six finite deferrals, no uplift.
+# All eleven governed timing states, in display order, from the canonical
+# registry: published, the six finite deferrals, no uplift, then the three
+# bespoke rate paths (Options 1-3).
 FED_POLICY_OPTIONS = fed_policy_state_ids()
 # The UI labels and the rate_paths policy states are separate vocabularies
 # ("off" vs "no_uplift", "delayed_6m" vs "delay_6m"). The current-model path
@@ -1008,18 +1009,11 @@ FED_POLICY_OPTIONS = fed_policy_state_ids()
 _OFFICIAL_POLICY_STATE_BY_UI_LABEL = {
     spec.state_id: spec.calculation_state_id for spec in FED_POLICY_SPECS
 }
+# Pure registry mirror: the clarified no-uplift wording now lives on the
+# registry spec itself (this PR is value-changing, so the governed
+# policy_label audit columns are being rebuilt anyway and no app-only
+# display override is needed any more).
 FED_POLICY_LABELS = {spec.state_id: spec.label for spec in FED_POLICY_SPECS}
-# Reader-facing clarification ONLY, applied at the presentation layer: the
-# no-uplift state removes just the initial 12c/L step - the legislated +6c/L
-# (1 Jan 2028) and every ongoing +4c/L annual step still apply - and the
-# dropdown should say so. The registry label, state ids, calculations and
-# every governed output are untouched (the registry label also feeds audit
-# frames inside governed packs, so it must not change for a wording fix).
-# The "No 12c uplift" prefix is load-bearing: e2e tests and readers match on
-# it, so extend it rather than replacing it.
-FED_POLICY_LABELS[FED_POLICY_OFF] = (
-    "No 12c uplift — 6c from 1 Jan 2028, then +4c/L annually"
-)
 FED_POLICY_NOTES = {
     FED_POLICY_PUBLISHED: (
         "Original published timing: the 12c/L step begins 1 January 2027. "
@@ -1029,7 +1023,7 @@ FED_POLICY_NOTES = {
     **{
         spec.state_id: spec.note
         for spec in FED_POLICY_SPECS
-        if spec.is_finite_deferral and spec.delay_months != 6
+        if spec.is_bespoke or (spec.is_finite_deferral and spec.delay_months != 6)
     },
     FED_POLICY_DELAYED_6M: FED_UPLIFT_DELAY_NOTE,
     FED_POLICY_OFF: FED_UPLIFT_NOTE,
@@ -1037,10 +1031,12 @@ FED_POLICY_NOTES = {
 
 
 def _normalise_fed_policy_state(value: Any) -> str:
-    """Return one of the eight reader-facing FED/RUC policy states.
+    """Return one of the eleven reader-facing FED/RUC policy states.
 
     Numeric and boolean values retain the former toggle semantics for cached
     callers: zero/False meant delayed, while one/True meant no uplift.
+    Superseded label spellings (the pre-clarification no-uplift wording and
+    its interim app-only override) resolve through the registry aliases.
     """
 
     if isinstance(value, bool):
@@ -1050,11 +1046,6 @@ def _normalise_fed_policy_state(value: Any) -> str:
     text = str(value or "").strip()
     lowered = text.casefold()
     label_lookup = {label.casefold(): state for state, label in FED_POLICY_LABELS.items()}
-    # Registry labels stay accepted spellings even where the displayed label
-    # is overridden (the no-uplift wording), so any stored pre-override
-    # selection still resolves to its state instead of the default.
-    for spec in FED_POLICY_SPECS:
-        label_lookup.setdefault(spec.label.casefold(), spec.state_id)
     if lowered in label_lookup:
         return label_lookup[lowered]
     aliases = fed_policy_state_aliases()
@@ -2343,7 +2334,7 @@ def _apply_fed_ruc_transition_overlay(
     loaded (fast path) or the reference chain has applied the selected timing
     state (slow path) - so the transition composes with every uptake, VFM,
     sensitivity, timing and conflict treatment those rows already carry, and
-    the materialised 8x8 catalogue is never multiplied. Off is a no-op.
+    the materialised 11x11 catalogue is never multiplied. Off is a no-op.
     """
     state = _fed_ruc_transition_state(ev_uptake_key)
     if state == FED_RUC_TRANSITION_OFF or rows is None or rows.empty:
@@ -7162,7 +7153,7 @@ def _render_lever_accordion(
             default=FED_POLICY_PUBLISHED,
         )
         fed_policy_sub = (
-            "<div class='page5-panel-sub'>Choose the original 1 January 2027 start, a deferral of 6 to 36 months in six-month steps, or no 12c uplift. The choice is carried into the PED retail-price input and proportionately into Light and Heavy RUC rates. Conventional RUC activity responds once to combined diesel-plus-RUC running cost; BEV/PHEV kilometres stay fixed because no approved class-specific charge elasticity is available. Only the initial 12c/L wedge is deferred: other scheduled increases retain their published dates, so the path catches up at the selected start date. Current scenarios and the MBU26 official comparator counterfactual are selected independently.</div>"
+            "<div class='page5-panel-sub'>Choose the original 1 January 2027 start, a deferral of 6 to 36 months in six-month steps, no 12c uplift, or one of the three bespoke rate paths (Options 1-3, each starting 1 January 2028 with its own step schedule). The choice is carried into the PED retail-price input and proportionately into Light and Heavy RUC rates. Conventional RUC activity responds once to combined diesel-plus-RUC running cost; BEV/PHEV kilometres stay fixed because no approved class-specific charge elasticity is available. The six-month deferral moves only the initial 12c/L wedge and catches up at its start date; longer deferrals shift the entire staircase; bespoke options replace the staircase with their own steps and may cross above published timing. Current scenarios and the MBU26 official comparator counterfactual are selected independently.</div>"
             if method_detail_enabled()
             else ""
         )
@@ -7182,7 +7173,11 @@ def _render_lever_accordion(
                     "their modelled activity response. Original timing starts 1 Jan 2027; the "
                     "six-month deferral starts the 12c step 1 Jul 2027; longer deferrals shift the "
                     "entire staircase by their duration (initial step 1 Jan 2028 through 1 Jan 2030); "
-                    "no uplift removes the 12c step entirely. "
+                    "no uplift removes the 12c step entirely. Options 1-3 are bespoke rate paths: "
+                    "no 12c in 2027, then their own ex-GST steps from 1 Jan 2028 (Option 1: 12c "
+                    "then 10c then +4c annually; Option 2: 9c then 9c then +4c annually; Option 3: "
+                    "+4c every six months, which crosses above the published staircase around "
+                    "mid-2031). "
                     + FED_DEFERRAL_CATCH_UP_NOTE
                 ),
                 **_widget_default_kwargs(
@@ -7212,7 +7207,8 @@ def _render_lever_accordion(
                         "Scope: MBU26 comparator only. The published source pack is never overwritten. "
                         "Original timing starts 1 Jan 2027; the six-month deferral starts the 12c "
                         "step 1 Jul 2027; longer deferrals shift the entire staircase by their "
-                        "duration; no uplift removes the 12c step entirely. "
+                        "duration; no uplift removes the 12c step entirely; Options 1-3 apply their "
+                        "bespoke step schedules from 1 Jan 2028. "
                         + FED_DEFERRAL_CATCH_UP_NOTE
                     ),
                     **_widget_default_kwargs(
@@ -8927,7 +8923,9 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                         "Download the exact FY2026-FY2030 Net FED, Net RUC and Net MVR comparison for Base "
                         "and the Low, Medium and High Middle East paths under original 1 January 2027 timing, "
                         "the six 12c deferrals (6 to 36 months, starting 1 July 2027 through 1 January 2030), "
-                        "and no 12c uplift. FY2027 is the year ending "
+                        "no 12c uplift, and the three bespoke rate paths (Options 1-3, each pricing at the "
+                        "no-uplift schedule through 2027 and applying its own ex-GST steps from 1 January "
+                        "2028). FY2027 is the year ending "
                         "June 2027, so every deferral equals no-uplift in FY2027; original timing "
                         "differs because it applies for January-June 2027. The six-month deferral moves only "
                         "the initial 12c/L wedge - later scheduled increases retain their published dates and "
@@ -10957,7 +10955,8 @@ def _render_comparison_scenario_column(
                     "Original timing starts 1 Jan 2027; the six-month deferral starts "
                     "the 12c step 1 Jul 2027; longer deferrals shift the entire "
                     "staircase by their duration; no uplift removes the 12c step "
-                    "entirely. Scope: MBU26 official comparator only. "
+                    "entirely; Options 1-3 apply their bespoke step schedules from "
+                    "1 Jan 2028. Scope: MBU26 official comparator only. "
                     + FED_DEFERRAL_CATCH_UP_NOTE
                 ),
             )
@@ -10984,7 +10983,8 @@ def _render_comparison_scenario_column(
         help=(
             "Original timing starts 1 Jan 2027; the six-month deferral starts the "
             "12c step 1 Jul 2027; longer deferrals shift the entire staircase by "
-            "their duration; no uplift removes the 12c step entirely. "
+            "their duration; no uplift removes the 12c step entirely; Options 1-3 "
+            "apply their bespoke step schedules from 1 Jan 2028. "
             "Scope: Selected current scenario only. " + FED_DEFERRAL_CATCH_UP_NOTE
         ),
     )
@@ -12325,7 +12325,7 @@ def revenue_rate_paths_figure(frame: pd.DataFrame, *, fed_policy_state: str) -> 
     # Registry-driven: one schedule column and one legend label per governed
     # state. The chart stays readable by drawing only the historical effective
     # rates, the published planned path as the reference, and the currently
-    # selected policy path - never all eight nearly identical lines at once.
+    # selected policy path - never all eleven nearly identical lines at once.
     selected_spec = fed_policy_spec(selected_state)
     selected_segment = selected_spec.schedule_column
 
@@ -12334,6 +12334,8 @@ def revenue_rate_paths_figure(frame: pd.DataFrame, *, fed_policy_state: str) -> 
             return "Original timing — 12c from Jan 2027"
         if spec.is_no_uplift:
             return "No 12c FED / proportional RUC uplift"
+        if spec.is_bespoke:
+            return spec.label
         return f"Deferred {spec.delay_months} months — 12c from {spec.start_date_text[2:]}"
 
     segment_labels = {spec.schedule_column: _segment_label(spec) for spec in FED_POLICY_SPECS}

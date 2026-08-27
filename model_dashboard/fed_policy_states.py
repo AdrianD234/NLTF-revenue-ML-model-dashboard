@@ -31,6 +31,21 @@ published timing: each deferred year leaves the rate 4c/L below original
 timing in every later year, and the path can also sit below the no-uplift
 counterfactual while a separately scheduled increase is still deferred.
 Both rules are documented in :data:`FED_DEFERRAL_CATCH_UP_NOTE`.
+
+A third schedule kind, the BESPOKE STEP PATH, is neither a deferral nor a
+shift of the published staircase. It skips the 2027 12c/L uplift entirely
+(pricing at the governed no-uplift schedule before its first step) and then
+applies its own explicit ex-GST step schedule from a stated start quarter:
+
+    before the first bespoke step: target = no_uplift
+    from the first step onward:    target = r0 + cumulative bespoke steps
+
+where ``r0`` is the governed pre-uplift base immediately before the first
+step (derived from the schedule, never hard-coded). Bespoke paths carry no
+duration semantics: they are excluded from :func:`finite_deferral_specs`,
+from duration-ordering and below-published validators (a bespoke path may
+cross above published timing), and their step schedules are stored
+explicitly on the spec as :class:`BespokeStepSchedule`.
 """
 from __future__ import annotations
 
@@ -38,11 +53,13 @@ from dataclasses import dataclass
 from types import MappingProxyType
 
 __all__ = [
+    "BespokeStepSchedule",
     "FED_DEFERRAL_CATCH_UP_NOTE",
     "FED_POLICY_SPECS",
     "FED_UPLIFT_START_PERIOD",
     "FedPolicySpec",
     "PolicyStateError",
+    "bespoke_specs",
     "calculation_state_ids",
     "finite_deferral_specs",
     "policy_spec",
@@ -96,6 +113,59 @@ def _start_date_text(start_period: str) -> str:
 
 
 @dataclass(frozen=True)
+class BespokeStepSchedule:
+    """Explicit ex-GST cents-per-litre step schedule for a bespoke rate path.
+
+    ``initial_steps`` are one-off increments applied at their stated calendar
+    quarters, in chronological order. ``recurring_step_nzd_per_litre`` is then
+    added at ``recurring_start_period`` and again every
+    ``recurring_interval_quarters`` thereafter, indefinitely through the
+    governed schedule horizon (there is no terminal step). All amounts are
+    incremental NZD/L on top of the governed pre-uplift base ``r0``, which is
+    derived from the schedule at build time, never stored here.
+    """
+
+    initial_steps: tuple[tuple[str, float], ...]
+    recurring_start_period: str
+    recurring_interval_quarters: int
+    recurring_step_nzd_per_litre: float
+
+    @property
+    def first_step_period(self) -> str:
+        """The calendar quarter of the first bespoke increment."""
+        if self.initial_steps:
+            return self.initial_steps[0][0]
+        return self.recurring_start_period
+
+    def cumulative_increase(self, period: str) -> float:
+        """Total NZD/L above ``r0`` in ``period`` (0.0 before the first step)."""
+        serial = quarter_serial(period)
+        total = sum(
+            step for step_period, step in self.initial_steps
+            if quarter_serial(step_period) <= serial
+        )
+        recurring_serial = quarter_serial(self.recurring_start_period)
+        if serial >= recurring_serial:
+            occurrences = 1 + (serial - recurring_serial) // self.recurring_interval_quarters
+            total += occurrences * self.recurring_step_nzd_per_litre
+        return total
+
+    def step_periods(self, horizon_period: str) -> tuple[str, ...]:
+        """Every quarter carrying a step, through ``horizon_period`` inclusive."""
+        horizon = quarter_serial(horizon_period)
+        serials = {
+            quarter_serial(step_period)
+            for step_period, _ in self.initial_steps
+            if quarter_serial(step_period) <= horizon
+        }
+        recurring_serial = quarter_serial(self.recurring_start_period)
+        serials.update(
+            range(recurring_serial, horizon + 1, self.recurring_interval_quarters)
+        )
+        return tuple(serial_quarter(serial) for serial in sorted(serials))
+
+
+@dataclass(frozen=True)
 class FedPolicySpec:
     """One governed 12c policy timing state.
 
@@ -116,10 +186,27 @@ class FedPolicySpec:
     is_published: bool
     is_no_uplift: bool
     note: str
+    bespoke_schedule: BespokeStepSchedule | None = None
+
+    @property
+    def is_bespoke(self) -> bool:
+        """Whether the state carries its own explicit step schedule."""
+        return self.bespoke_schedule is not None
+
+    @property
+    def schedule_kind(self) -> str:
+        """Explicit schedule-generation rule identifier for audits and builders."""
+        if self.is_published:
+            return "published"
+        if self.is_no_uplift:
+            return "no_uplift"
+        if self.is_bespoke:
+            return "bespoke_steps"
+        return "staircase_shift" if self.delay_months > 6 else "wedge_deferral"
 
     @property
     def is_finite_deferral(self) -> bool:
-        return not self.is_published and not self.is_no_uplift
+        return not self.is_published and not self.is_no_uplift and not self.is_bespoke
 
     @property
     def is_staircase_shift(self) -> bool:
@@ -138,6 +225,8 @@ class FedPolicySpec:
             return "planned"
         if self.is_no_uplift:
             return "no_uplift"
+        if self.is_bespoke:
+            return self.state_id
         return f"delayed_{self.delay_months}m"
 
     @property
@@ -147,6 +236,8 @@ class FedPolicySpec:
             return "published"
         if self.is_no_uplift:
             return "no_uplift"
+        if self.is_bespoke:
+            return self.state_id
         return f"shifted_{self.delay_months}m"
 
     @property
@@ -156,6 +247,8 @@ class FedPolicySpec:
             return "published"
         if self.is_no_uplift:
             return "no_uplift"
+        if self.is_bespoke:
+            return self.state_id
         return f"delayed_{self.delay_months}m"
 
     @property
@@ -165,6 +258,8 @@ class FedPolicySpec:
             raise PolicyStateError("The published state has no policy-variant suffix.")
         if self.is_no_uplift:
             return "12c_no_uplift"
+        if self.is_bespoke:
+            return self.state_id
         return f"12c_delay_{self.delay_months}m"
 
     @property
@@ -174,6 +269,8 @@ class FedPolicySpec:
             raise PolicyStateError("The published state has no policy-variant phrase.")
         if self.is_no_uplift:
             return "12c uplift off"
+        if self.is_bespoke:
+            return self.label
         if self.delay_months == 6:
             return "12c deferred six months"
         return f"12c deferred {self.delay_months} months"
@@ -185,7 +282,17 @@ class FedPolicySpec:
             raise PolicyStateError("The published state has no policy phrase.")
         if self.is_no_uplift:
             return "12c off"
+        if self.is_bespoke:
+            return self.short_bespoke_phrase
         return f"12c delayed {self.delay_months}m"
+
+    @property
+    def short_bespoke_phrase(self) -> str:
+        """Compact bespoke phrase (``Option 1 (12c+10c)``), from the label."""
+        if not self.is_bespoke:
+            raise PolicyStateError(f"{self.state_id!r} is not a bespoke rate path.")
+        head = self.label.split("—", maxsplit=1)[0].strip()
+        return head or self.state_id
 
     @property
     def timing_id(self) -> str:
@@ -203,6 +310,8 @@ class FedPolicySpec:
             return "12c original timing: from 1 Jan 2027"
         if self.is_no_uplift:
             return "12c uplift off"
+        if self.is_bespoke:
+            return self.label
         if self.delay_months == 6:
             return "12c deferred six months: from 1 Jul 2027"
         return f"12c deferred {self.delay_months} months: from {self.start_date_text}"
@@ -214,6 +323,8 @@ class FedPolicySpec:
             raise PolicyStateError("The published state never touches a chart row.")
         if self.is_no_uplift:
             return "fed_uplift_off"
+        if self.is_bespoke:
+            return f"fed_bespoke_{self.state_id}"
         return f"fed_uplift_delayed_{self.delay_months}m"
 
     @property
@@ -223,6 +334,10 @@ class FedPolicySpec:
             raise PolicyStateError("The published state never touches a chart row.")
         if self.is_no_uplift:
             return "fed_uplift_counterfactual"
+        if self.is_bespoke:
+            # Deliberately option-free, mirroring the deferral marker: the
+            # option identity lives in value_status and _fed_policy.
+            return "fed_bespoke_rate_counterfactual"
         # Deliberately duration-free, preserving the six-month production
         # marker byte-for-byte; the duration lives in value_status and
         # _fed_policy.
@@ -251,6 +366,12 @@ class FedPolicySpec:
         if self.is_no_uplift:
             raise PolicyStateError(
                 "The no-uplift window is unbounded; derive it from the governed schedule."
+            )
+        if self.is_bespoke:
+            raise PolicyStateError(
+                "A bespoke rate path's direct window depends on where its step "
+                "schedule meets the published staircase; derive it from the "
+                "governed schedule (rate_paths.fed_policy_affected_periods)."
             )
         first = quarter_serial(FED_UPLIFT_START_PERIOD)
         last = quarter_serial(self.start_period)
@@ -299,6 +420,38 @@ def _deferral_spec(months: int, order: int) -> FedPolicySpec:
     )
 
 
+def _bespoke_spec(
+    state_id: str,
+    label: str,
+    schedule: BespokeStepSchedule,
+    order: int,
+    note: str,
+) -> FedPolicySpec:
+    return FedPolicySpec(
+        state_id=state_id,
+        calculation_state_id=state_id,
+        label=label,
+        delay_months=-1,
+        delay_quarters=-1,
+        start_period=schedule.first_step_period,
+        display_order=order,
+        is_published=False,
+        is_no_uplift=False,
+        note=note,
+        bespoke_schedule=schedule,
+    )
+
+
+_BESPOKE_TRANSMISSION_NOTE = (
+    "Every amount is an incremental EX-GST cents-per-litre increase on the "
+    "governed pre-uplift base, derived from the schedule at build time. The "
+    "PED retail-price input carries the selected-minus-published wedge and "
+    "the same proportional selected/planned signal is applied to Light and "
+    "Heavy RUC rates and real RUC model-price inputs; governed coefficients "
+    "determine the resulting volume response."
+)
+
+
 FED_POLICY_SPECS: tuple[FedPolicySpec, ...] = (
     FedPolicySpec(
         state_id="published",
@@ -320,7 +473,12 @@ FED_POLICY_SPECS: tuple[FedPolicySpec, ...] = (
     FedPolicySpec(
         state_id="off",
         calculation_state_id="no_uplift",
-        label="No 12c uplift",
+        # The wording spells out what the state already implements: no 12c,
+        # everything else on schedule (the legislated +6c/L on 1 Jan 2028 and
+        # the ongoing +4c/L annual staircase still apply). This label feeds
+        # policy_label audit columns inside governed packs, so changing it is
+        # a value-changing edit; the previous wording stays an accepted alias.
+        label="No 12c uplift — 6c from 1 Jan 2028, then +4c/L annually",
         delay_months=-1,
         delay_quarters=-1,
         start_period="",
@@ -331,6 +489,70 @@ FED_POLICY_SPECS: tuple[FedPolicySpec, ...] = (
             "The 12c uplift is removed entirely: from 2027Q1 onward PED and "
             "all RUC collection rates follow the governed no-uplift schedule, "
             "carried parallel to the planned path beyond the legislated window."
+        ),
+    ),
+    _bespoke_spec(
+        "option1_12c_10c_4c",
+        "Option 1 — 12c on 1 Jan 2028, 10c on 1 Jan 2029, then +4c annually",
+        BespokeStepSchedule(
+            initial_steps=(("2028Q1", 0.12), ("2029Q1", 0.10)),
+            recurring_start_period="2030Q1",
+            recurring_interval_quarters=4,
+            recurring_step_nzd_per_litre=0.04,
+        ),
+        order=8,
+        note=(
+            "Bespoke rate path: the 2027 12c/L uplift does not occur (the "
+            "path prices at the governed no-uplift schedule through calendar "
+            "2027), then +12c/L applies on 1 January 2028 and +10c/L on "
+            "1 January 2029, followed by +4c/L at every later 1 January "
+            "through the governed horizon. From 1 January 2029 the direct "
+            "rate equals the published staircase and tracks it thereafter, "
+            "so direct rate deltas close at that boundary. "
+            + _BESPOKE_TRANSMISSION_NOTE
+        ),
+    ),
+    _bespoke_spec(
+        "option2_9c_9c_4c",
+        "Option 2 — 9c on 1 Jan 2028, 9c on 1 Jan 2029, then +4c annually",
+        BespokeStepSchedule(
+            initial_steps=(("2028Q1", 0.09), ("2029Q1", 0.09)),
+            recurring_start_period="2030Q1",
+            recurring_interval_quarters=4,
+            recurring_step_nzd_per_litre=0.04,
+        ),
+        order=9,
+        note=(
+            "Bespoke rate path: the 2027 12c/L uplift does not occur (the "
+            "path prices at the governed no-uplift schedule through calendar "
+            "2027), then +9c/L applies on 1 January 2028 and +9c/L on "
+            "1 January 2029, followed by +4c/L at every later 1 January "
+            "through the governed horizon. From 1 January 2029 the path "
+            "prices exactly like the 12-month full-staircase shift while "
+            "sitting 3c/L below that state during calendar 2028. "
+            + _BESPOKE_TRANSMISSION_NOTE
+        ),
+    ),
+    _bespoke_spec(
+        "option3_4c_semiannual",
+        "Option 3 — +4c every six months from 1 Jan 2028",
+        BespokeStepSchedule(
+            initial_steps=(),
+            recurring_start_period="2028Q1",
+            recurring_interval_quarters=2,
+            recurring_step_nzd_per_litre=0.04,
+        ),
+        order=10,
+        note=(
+            "Bespoke rate path: the 2027 12c/L uplift does not occur (the "
+            "path prices at the governed no-uplift schedule through calendar "
+            "2027), then +4c/L applies on 1 January 2028 and a further "
+            "+4c/L every six months (each 1 January and 1 July) through the "
+            "governed horizon, with no terminal step. Rising +8c/L per "
+            "calendar year, the path crosses above the published staircase "
+            "at 2031Q3 and keeps diverging upward, so below-published and "
+            "duration-ordering validators deliberately do not apply. "
+            + _BESPOKE_TRANSMISSION_NOTE
         ),
     ),
 )
@@ -361,6 +583,11 @@ def _alias_map() -> dict[str, str]:
             "none": "off",
             "12c_off": "off",
             "12c_no_uplift": "off",
+            # Pre-2026-08 registry label and its interim app-only display
+            # override, kept as accepted spellings so any stored label-text
+            # selection still resolves instead of falling to the default.
+            "no 12c uplift": "off",
+            "no 12c uplift — 6c from 1 jan 2028, then +4c/l annually": "off",
         }
     )
     return aliases
@@ -390,7 +617,7 @@ def policy_spec(state: object) -> FedPolicySpec:
 
 
 def policy_state_ids() -> tuple[str, ...]:
-    """The eight runtime/UI state IDs in display order."""
+    """The eleven runtime/UI state IDs in display order."""
     return tuple(spec.state_id for spec in FED_POLICY_SPECS)
 
 
@@ -400,23 +627,34 @@ def policy_state_aliases() -> dict[str, str]:
 
 
 def calculation_state_ids() -> tuple[str, ...]:
-    """The eight calculation-layer state IDs in display order."""
+    """The eleven calculation-layer state IDs in display order."""
     return tuple(spec.calculation_state_id for spec in FED_POLICY_SPECS)
 
 
 def finite_deferral_specs() -> tuple[FedPolicySpec, ...]:
-    """The six finite deferrals, shortest first."""
+    """The six finite deferrals, shortest first (bespoke paths excluded)."""
     return tuple(spec for spec in FED_POLICY_SPECS if spec.is_finite_deferral)
+
+
+def bespoke_specs() -> tuple[FedPolicySpec, ...]:
+    """The three bespoke step-path states, in display order."""
+    return tuple(spec for spec in FED_POLICY_SPECS if spec.is_bespoke)
 
 
 def _validate_registry() -> None:
     specs = FED_POLICY_SPECS
-    if len(specs) != 8:
-        raise PolicyStateError(f"Expected exactly 8 policy states, found {len(specs)}.")
+    if len(specs) != 11:
+        raise PolicyStateError(f"Expected exactly 11 policy states, found {len(specs)}.")
     for field in ("state_id", "calculation_state_id", "label", "display_order"):
         values = [getattr(spec, field) for spec in specs]
         if len(set(values)) != len(values):
             raise PolicyStateError(f"Duplicate {field} in the policy-state registry.")
+    # Derived identity vocabularies must also be collision-free: pair ids,
+    # schedule columns and matrix path suffixes each key downstream frames.
+    for derived in ("schedule_column", "path_suffix", "pair_state_suffix", "timing_id"):
+        values = [getattr(spec, derived) for spec in specs]
+        if len(set(values)) != len(values):
+            raise PolicyStateError(f"Duplicate derived {derived} in the policy-state registry.")
     deferrals = finite_deferral_specs()
     if len(deferrals) != 6:
         raise PolicyStateError(f"Expected exactly 6 finite deferrals, found {len(deferrals)}.")
@@ -431,6 +669,38 @@ def _validate_registry() -> None:
         window = spec.direct_affected_quarters()
         if len(window) != spec.delay_quarters or window[0] != FED_UPLIFT_START_PERIOD:
             raise PolicyStateError(f"Direct window for {spec.state_id} is malformed: {window}.")
+    bespoke = bespoke_specs()
+    if len(bespoke) != 3:
+        raise PolicyStateError(f"Expected exactly 3 bespoke rate paths, found {len(bespoke)}.")
+    for spec in bespoke:
+        schedule = spec.bespoke_schedule
+        if schedule is None:
+            raise PolicyStateError(f"Bespoke state {spec.state_id} has no step schedule.")
+        if spec.start_period != schedule.first_step_period:
+            raise PolicyStateError(
+                f"Bespoke state {spec.state_id} start_period must equal its first step."
+            )
+        if quarter_serial(schedule.first_step_period) <= quarter_serial(FED_UPLIFT_START_PERIOD):
+            raise PolicyStateError(
+                f"Bespoke state {spec.state_id} must start after the 12c uplift date."
+            )
+        step_serials = [quarter_serial(period) for period, _ in schedule.initial_steps]
+        if step_serials != sorted(set(step_serials)):
+            raise PolicyStateError(
+                f"Bespoke state {spec.state_id} initial steps must be strictly chronological."
+            )
+        if any(step <= 0.0 for _, step in schedule.initial_steps):
+            raise PolicyStateError(f"Bespoke state {spec.state_id} steps must be positive.")
+        if schedule.recurring_step_nzd_per_litre <= 0.0:
+            raise PolicyStateError(f"Bespoke state {spec.state_id} recurring step must be positive.")
+        if schedule.recurring_interval_quarters not in (2, 4):
+            raise PolicyStateError(
+                f"Bespoke state {spec.state_id} recurring interval must be semiannual or annual."
+            )
+        if step_serials and quarter_serial(schedule.recurring_start_period) <= step_serials[-1]:
+            raise PolicyStateError(
+                f"Bespoke state {spec.state_id} recurring steps must begin after its initial steps."
+            )
 
 
 _validate_registry()

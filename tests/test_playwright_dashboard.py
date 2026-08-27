@@ -15,6 +15,7 @@ from model_dashboard.conflict_fuel_paths import (
 )
 from model_dashboard.data.chart_sources import resolve_chart_source_output_dir
 from model_dashboard.data_loader import DEFAULT_EVIDENCE_PACK_ROOT, load_evidence_pack
+from model_dashboard.fed_policy_states import FED_POLICY_SPECS
 from model_dashboard.fuel_price_scenario import POLICY_PATH_IDS
 
 pytestmark = pytest.mark.e2e
@@ -272,24 +273,27 @@ def test_revenue_outlook_fleet_layout_and_timing_csv_download(page: Page) -> Non
     download = download_info.value
     assert download.suggested_filename == "net_revenue_12c_timing_comparison_fy2026_fy2030.csv"
     frame = pd.read_csv(download.path())
-    assert len(frame) == 180
+    # Registry-driven: 4 families x 11 timing states x 5 FY x 3 series.
+    assert len(frame) == 660
     assert not frame.duplicated(["path_id", "FY", "series_id"]).any()
     assert set(frame["path_id"]) == {
-        f"{family}_{timing}"
+        f"{family}_{spec.path_suffix}"
         for family in ("baseline", *CONFLICT_FUEL_SCENARIO_LEVELS)
-        for timing in ("published", "shifted_6m", "no_uplift")
+        for spec in FED_POLICY_SPECS
     }
     assert set(frame["scenario_family_id"]) == {"base", *CONFLICT_FUEL_SCENARIO_LEVELS}
     path_metadata = frame[
         ["path_id", "scenario_id", "policy_state"]
     ].drop_duplicates()
-    assert len(path_metadata) == 12
+    assert len(path_metadata) == 44
     assert all(
         POLICY_PATH_IDS[str(row["scenario_id"])] == str(row["path_id"])
         for _, row in path_metadata.iterrows()
     )
-    assert set(frame["policy_state"]) == {"published", "delay_6m", "no_uplift"}
-    assert set(frame["timing_id"]) == {"published", "delayed_6m", "no_uplift"}
+    assert set(frame["policy_state"]) == {
+        spec.calculation_state_id for spec in FED_POLICY_SPECS
+    }
+    assert set(frame["timing_id"]) == {spec.timing_id for spec in FED_POLICY_SPECS}
     assert set(pd.to_numeric(frame["FY"], errors="raise").astype(int)) == set(range(2026, 2031))
     assert set(frame["series_id"]) == {
         "net_fed_revenue",

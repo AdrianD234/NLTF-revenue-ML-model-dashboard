@@ -1317,7 +1317,7 @@ def test_no_uplift_dropdown_label_is_presentation_only() -> None:
 
 
 def test_revenue_outlook_renders_every_governed_policy_duration() -> None:
-    """The eight-state Current 12c dropdown, exercised end to end.
+    """The eleven-state Current 12c dropdown, exercised end to end.
 
     Every governed timing state renders without an exception, the selection
     persists across the rerun, and the active-lever summary names the exact
@@ -1337,7 +1337,7 @@ def test_revenue_outlook_renders_every_governed_policy_duration() -> None:
         "No 12c uplift — 6c from 1 Jan 2028, then +4c/L annually"
         in policy.options
     )
-    assert len(policy.options) == 8
+    assert len(policy.options) == 11
     # Preserved production default: the six-month deferral.
     assert str(policy.value) == app.FED_POLICY_DELAYED_6M
     for state in app.FED_POLICY_OPTIONS:
