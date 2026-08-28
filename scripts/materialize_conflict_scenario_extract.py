@@ -2074,12 +2074,12 @@ def _validation_frame(
             ),
         )
 
-    # Bespoke rate paths (Options 1-3): no deferral rule applies, so both
+    # Bespoke rate paths (Options 1-4): no deferral rule applies, so both
     # orderings - against original timing AND against the no-uplift path -
     # are dictated per fiscal year by the governed schedule's mean rates.
-    # Option 1 rejoins the published staircase (coincident outer years),
-    # Option 3 crosses above it beyond this extract's horizon; neither a
-    # never-rejoins nor an always-below bound is ever asserted here.
+    # Option 1 rejoins the published staircase (coincident outer years) and
+    # the others hold schedule-specific wedges; neither a never-rejoins nor
+    # an always-below bound is ever asserted here.
     planned_fy_mean = pd.to_numeric(schedule_fy_means["planned"], errors="coerce")
     for bespoke_state_spec in FED_POLICY_SPECS:
         if not bespoke_state_spec.is_bespoke:
@@ -2112,8 +2112,9 @@ def _validation_frame(
             max_abs_error=float(shared_error) if pd.notna(shared_error) else None,
             detail=(
                 f"The {timing} bespoke path skips the 2027 uplift entirely and "
-                "holds the pre-uplift base until its own first step (2028Q1 for "
-                "Options 1-3, 2030Q1 for Option 4), so through FY2027 it is "
+                "holds the pre-uplift base until its own first step (2027Q3 for "
+                "Option 3, 2028Q1 for Options 1-2, 2030Q1 for Option 4) - every "
+                "first step lands after June 2027, so through FY2027 it is "
                 "identical to off (and therefore to every other bespoke option)."
             ),
         )
@@ -2224,11 +2225,12 @@ def _validation_frame(
                 max_abs_error=None,
                 detail=(
                     f"A bespoke path carries no fixed side of {reference_name}: "
-                    "Option 1 rejoins the published staircase, Option 3 crosses "
-                    "above it, Option 3 sits below the no-uplift path during "
-                    "calendar 2028, and Option 4 sits below no-uplift from 2028 "
-                    "onward. The governed quarterly schedule is the single "
-                    "source of truth for which side each fiscal year falls on."
+                    "Option 1 rejoins the published staircase, Option 3 sits "
+                    "above the no-uplift path from its first step in mid-2027 "
+                    "while holding 6c below published from mid-2028, and "
+                    "Option 4 sits below no-uplift from 2028 onward. The "
+                    "governed quarterly schedule is the single source of truth "
+                    "for which side each fiscal year falls on."
                 ),
             )
 

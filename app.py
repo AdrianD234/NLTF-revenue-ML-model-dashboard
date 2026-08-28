@@ -7153,7 +7153,7 @@ def _render_lever_accordion(
             default=FED_POLICY_PUBLISHED,
         )
         fed_policy_sub = (
-            "<div class='page5-panel-sub'>Choose the original 1 January 2027 start, a deferral of 6 to 36 months in six-month steps, no 12c uplift, or one of the four bespoke rate paths (Options 1-4, each replacing the legislated staircase with its own step schedule). The choice is carried into the PED retail-price input and proportionately into Light and Heavy RUC rates. Conventional RUC activity responds once to combined diesel-plus-RUC running cost; BEV/PHEV kilometres stay fixed because no approved class-specific charge elasticity is available. The six-month deferral moves only the initial 12c/L wedge and catches up at its start date; longer deferrals shift the entire staircase; bespoke options replace the staircase with their own steps and may cross above published timing or hold a constant wedge below it. Current scenarios and the MBU26 official comparator counterfactual are selected independently.</div>"
+            "<div class='page5-panel-sub'>Choose the original 1 January 2027 start, a deferral of 6 to 36 months in six-month steps, no 12c uplift, or one of the four bespoke rate paths (Options 1-4, each replacing the legislated staircase with its own step schedule). The choice is carried into the PED retail-price input and proportionately into Light and Heavy RUC rates. Conventional RUC activity responds once to combined diesel-plus-RUC running cost; BEV/PHEV kilometres stay fixed because no approved class-specific charge elasticity is available. The six-month deferral moves only the initial 12c/L wedge and catches up at its start date; longer deferrals shift the entire staircase; bespoke options replace the staircase with their own steps and settle into schedule-specific wedges against published timing. Current scenarios and the MBU26 official comparator counterfactual are selected independently.</div>"
             if method_detail_enabled()
             else ""
         )
@@ -7174,12 +7174,13 @@ def _render_lever_accordion(
                     "six-month deferral starts the 12c step 1 Jul 2027; longer deferrals shift the "
                     "entire staircase by their duration (initial step 1 Jan 2028 through 1 Jan 2030); "
                     "no uplift removes the 12c step entirely. Options 1-4 are bespoke rate paths "
-                    "with no 12c in 2027 and their own ex-GST steps (Option 1: 12c then 10c then "
+                    "with no 12c step and their own ex-GST schedules (Option 1: 12c then 10c then "
                     "+4c annually from 1 Jan 2028; Option 2: 9c then 9c then +4c annually from "
-                    "1 Jan 2028; Option 3: +4c every six months from 1 Jan 2028, crossing above "
-                    "the published staircase around mid-2031; Option 4, a user-defined "
-                    "illustrative Labour scenario: no increases at all until +4c annually from "
-                    "1 Jan 2030, a constant 22c below published thereafter). "
+                    "1 Jan 2028; Option 3: a temporary +4c every six months from 1 Jul 2027 to "
+                    "1 Jan 2029, then +4c annually from 2030, a constant 6c below published from "
+                    "mid-2028; Option 4, modelled on Labour's announced fuel excise freeze: no "
+                    "increases at all until +4c annually from 1 Jan 2030 - the 2030 resumption "
+                    "is a modelling assumption - a constant 22c below published thereafter). "
                     + FED_DEFERRAL_CATCH_UP_NOTE
                 ),
                 **_widget_default_kwargs(
