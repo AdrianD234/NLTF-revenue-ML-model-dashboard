@@ -42,10 +42,10 @@ applies its own explicit ex-GST step schedule from a stated start quarter:
 
 where ``r0`` is the governed pre-uplift base immediately before the first
 step (derived from the schedule, never hard-coded). Bespoke paths carry no
-duration semantics: they are excluded from :func:`finite_deferral_specs`,
-from duration-ordering and below-published validators (a bespoke path may
-cross above published timing), and their step schedules are stored
-explicitly on the spec as :class:`BespokeStepSchedule`.
+duration semantics: they are excluded from :func:`finite_deferral_specs`
+and from duration-ordering and below-published validators (a bespoke path
+carries no fixed side of published timing), and their step schedules are
+stored explicitly on the spec as :class:`BespokeStepSchedule`.
 """
 from __future__ import annotations
 
@@ -535,23 +535,28 @@ FED_POLICY_SPECS: tuple[FedPolicySpec, ...] = (
     ),
     _bespoke_spec(
         "option3_4c_semiannual",
-        "Option 3 — +4c every six months from 1 Jan 2028",
+        "Option 3 — +4c every six months from 1 Jul 2027 to 1 Jan 2029, then +4c annually",
         BespokeStepSchedule(
-            initial_steps=(),
-            recurring_start_period="2028Q1",
-            recurring_interval_quarters=2,
+            initial_steps=(
+                ("2027Q3", 0.04),
+                ("2028Q1", 0.04),
+                ("2028Q3", 0.04),
+                ("2029Q1", 0.04),
+            ),
+            recurring_start_period="2030Q1",
+            recurring_interval_quarters=4,
             recurring_step_nzd_per_litre=0.04,
         ),
         order=10,
         note=(
-            "Bespoke rate path: the 2027 12c/L uplift does not occur (the "
-            "path prices at the governed no-uplift schedule through calendar "
-            "2027), then +4c/L applies on 1 January 2028 and a further "
-            "+4c/L every six months (each 1 January and 1 July) through the "
-            "governed horizon, with no terminal step. Rising +8c/L per "
-            "calendar year, the path crosses above the published staircase "
-            "at 2031Q3 and keeps diverging upward, so below-published and "
-            "duration-ordering validators deliberately do not apply. "
+            "Bespoke rate path: the 2027 12c/L uplift does not occur; "
+            "instead a TEMPORARY six-monthly acceleration applies: +4c/L on "
+            "1 July 2027, 1 January 2028, 1 July 2028 and 1 January 2029 "
+            "(the final six-monthly step - there is deliberately no step on "
+            "1 July 2029), then the normal +4c/L at every 1 January resumes "
+            "from 1 January 2030 through the governed horizon. Because both "
+            "paths then rise by the same annual amount, the path sits a "
+            "constant 6c/L below published timing from 2028Q3 onward. "
             + _BESPOKE_TRANSMISSION_NOTE
         ),
     ),
@@ -566,16 +571,17 @@ FED_POLICY_SPECS: tuple[FedPolicySpec, ...] = (
         ),
         order=11,
         note=(
-            "Bespoke rate path, a user-defined illustrative scenario rather "
-            "than a sourced or officially announced party policy. NOT the "
-            "36-month full-staircase deferral: the original +12c/L and "
-            "+6c/L increases never land and never catch up. The rate holds "
-            "the governed pre-uplift base through 2029Q4, then rises +4c/L "
-            "on 1 January 2030 and every later 1 January through the "
-            "governed horizon. Published timing reaches r0+26c by 2030Q1 "
-            "while this path reaches only r0+4c, and both then add +4c "
-            "annually, so the path sits a constant 22c/L below published "
-            "timing from 2030Q1 onward. "
+            "Bespoke rate path modelled on Labour's announced Election-2026 "
+            "fuel excise freeze (no increases for the full parliamentary "
+            "term). NOT the 36-month full-staircase deferral: the original "
+            "+12c/L and +6c/L increases and the 2029 4c step never land and "
+            "never catch up - the rate holds the governed pre-uplift base "
+            "through 2029Q4. The resumption of +4c/L at every 1 January "
+            "from 1 January 2030 through the governed horizon is a "
+            "modelling assumption, not announced policy. Published timing "
+            "reaches r0+26c by 2030Q1 while this path reaches only r0+4c, "
+            "and both then add +4c annually, so the path sits a constant "
+            "22c/L below published timing from 2030Q1 onward. "
             + _BESPOKE_TRANSMISSION_NOTE
         ),
     ),
