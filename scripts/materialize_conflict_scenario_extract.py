@@ -80,12 +80,11 @@ from model_dashboard.revenue_outlook import (
 
 START_FY = 2026
 END_FY = 2030
-# v5: the timing dimension expanded from eight states to twelve, adding the
-# four bespoke rate paths (Options 1-4: no legislated increases, each holding
-# the pre-uplift base until its own first ex-GST step); 48 paths in total.
-# Values on the original 32 paths are unchanged apart from the clarified
-# no-uplift policy label.
-EXTRACT_VERSION = "governed-ar1-conflict-scenario-extract-v5"
+# v6: the timing dimension expanded from twelve states to thirteen, adding
+# the owner-specified MCERT bespoke path (+5c six-monthly 2028Q1-2029Q3,
+# then +5c annually); 52 paths in total. Values on the previous 48 paths are
+# unchanged.
+EXTRACT_VERSION = "governed-ar1-conflict-scenario-extract-v6"
 ASSUMPTIONS_FILENAME = "conflict_scenario_assumptions.csv"
 REVENUE_FILENAME = "conflict_scenario_annual_revenue.csv"
 ACTIVITY_FILENAME = "conflict_scenario_annual_activity.csv"
@@ -133,7 +132,7 @@ _SERIES_METADATA["total_fed_ruc_net_revenue"] = {
 
 @dataclass(frozen=True)
 class ExportPath:
-    """Stable metadata for one of the 48 requested export paths."""
+    """Stable metadata for one of the 52 requested export paths."""
 
     family_id: str
     family_order: int
@@ -163,7 +162,7 @@ def _scenario_id_for(family_severity: str, calculation_state_id: str) -> str:
 
 
 def _export_paths() -> tuple[ExportPath, ...]:
-    """The 48 public paths: four families crossed with twelve timing states."""
+    """The 52 public paths: four families crossed with thirteen timing states."""
     paths: list[ExportPath] = []
     family_specs = [
         ("base", 0, "", "Current finalist Base case"),
@@ -2113,7 +2112,7 @@ def _validation_frame(
             detail=(
                 f"The {timing} bespoke path skips the 2027 uplift entirely and "
                 "holds the pre-uplift base until its own first step (2027Q3 for "
-                "Option 3, 2028Q1 for Options 1-2, 2030Q1 for Option 4) - every "
+                "Option 3, 2028Q1 for Options 1-2 and MCERT, 2030Q1 for Option 4) - every "
                 "first step lands after June 2027, so through FY2027 it is "
                 "identical to off (and therefore to every other bespoke option)."
             ),

@@ -17,7 +17,10 @@ Covers the acceptance tests the deferral-duration handoff names:
     (1 Jul 2027 to 1 Jan 2029, then annual, a constant 6c below published
     from 2028Q3), and Option 4's (Labour scenario) flat pause to 2029Q4
     followed by +4c annually with a constant 22c mature wedge below
-    published.
+    published;
+  * the owner-specified MCERT path: four temporary six-monthly +5c steps
+    (2028Q1-2029Q3), then +5c annually from 2030, catching published exactly
+    at 2031Q1 and exceeding it by a further 1c each later year.
 """
 from __future__ import annotations
 
@@ -57,6 +60,7 @@ EXPECTED_STATE_IDS = (
     "option2_9c_9c_4c",
     "option3_4c_semiannual",
     "option4_labour_4c",
+    "mcert",
 )
 EXPECTED_CALC_IDS = (
     "published",
@@ -71,6 +75,7 @@ EXPECTED_CALC_IDS = (
     "option2_9c_9c_4c",
     "option3_4c_semiannual",
     "option4_labour_4c",
+    "mcert",
 )
 EXPECTED_STARTS = ("2027Q3", "2028Q1", "2028Q3", "2029Q1", "2029Q3", "2030Q1")
 EXPECTED_LABELS = (
@@ -86,6 +91,7 @@ EXPECTED_LABELS = (
     "Option 2 — 9c on 1 Jan 2028, 9c on 1 Jan 2029, then +4c annually",
     "Option 3 — +4c every six months from 1 Jul 2027 to 1 Jan 2029, then +4c annually",
     "Option 4 — Labour scenario: 36-month pause, then +4c annually from 1 Jan 2030",
+    "MCERT — +5c every six months from 1 Jan 2028 for four steps, then +5c annually",
 )
 BESPOKE_STATE_IDS = EXPECTED_STATE_IDS[8:]
 # Direct rate-affected calendar-quarter windows per finite deferral. The
@@ -120,11 +126,11 @@ NO_UPLIFT_BY_YEAR = {2027: 0.70024, 2028: 0.76024, 2029: 0.80024, 2030: 0.84024}
 # --------------------------------------------------------------- A. registry
 
 
-def test_registry_has_exactly_twelve_states_in_display_order() -> None:
+def test_registry_has_exactly_thirteen_states_in_display_order() -> None:
     assert policy_state_ids() == EXPECTED_STATE_IDS
     assert calculation_state_ids() == EXPECTED_CALC_IDS
     assert tuple(spec.label for spec in FED_POLICY_SPECS) == EXPECTED_LABELS
-    assert tuple(spec.display_order for spec in FED_POLICY_SPECS) == tuple(range(12))
+    assert tuple(spec.display_order for spec in FED_POLICY_SPECS) == tuple(range(13))
 
 
 def test_registry_has_exactly_six_finite_deferrals() -> None:
@@ -646,6 +652,7 @@ def test_bespoke_registry_metadata_is_explicit() -> None:
         "option2_9c_9c_4c": ("2028Q1", "1 Jan 2028"),
         "option3_4c_semiannual": ("2027Q3", "1 Jul 2027"),
         "option4_labour_4c": ("2030Q1", "1 Jan 2030"),
+        "mcert": ("2028Q1", "1 Jan 2028"),
     }
     for spec in specs:
         assert spec.is_bespoke
@@ -918,6 +925,88 @@ def test_labour_scenario_holds_a_constant_22c_wedge_below_published(quarterly) -
         assert float(planned.at[quarter]) - float(labour.at[quarter]) == pytest.approx(
             0.22, abs=1e-9
         ), quarter
+
+
+# The consultant's MCERT pins: r0 plus four temporary six-monthly +5c steps
+# (2028Q1-2029Q3), then +5c at every 1 January from 2030.
+MCERT_PIN_TABLE = {
+    "2027Q4": 0.70024,
+    "2028Q1": 0.75024,
+    "2028Q3": 0.80024,
+    "2029Q1": 0.85024,
+    "2029Q3": 0.90024,
+    "2030Q1": 0.95024,
+    "2030Q3": 0.95024,
+    "2031Q1": 1.00024,
+    "2032Q1": 1.05024,
+    "2050Q1": 1.95024,
+}
+
+
+def test_mcert_quarterly_pins_and_no_2027_change(quarterly) -> None:
+    mcert = pd.to_numeric(quarterly["mcert"], errors="coerce")
+    for quarter, expected in MCERT_PIN_TABLE.items():
+        assert float(mcert.at[quarter]) == pytest.approx(expected, abs=1e-12), quarter
+    # No increase anywhere in calendar 2027: the path holds r0 all year.
+    for quarter in ("2027Q1", "2027Q2", "2027Q3", "2027Q4"):
+        assert float(mcert.at[quarter]) == pytest.approx(0.70024, abs=1e-12), quarter
+
+
+def test_mcert_four_semiannual_steps_then_annual(quarterly) -> None:
+    """Exactly four six-monthly +5c steps (2028Q1, 2028Q3, 2029Q1, 2029Q3),
+    no further semiannual step, then Q1-only +5c steps from 2030Q1 through
+    the horizon."""
+    mcert = pd.to_numeric(quarterly["mcert"], errors="coerce")
+    steps: list[tuple[str, float]] = []
+    previous = None
+    for quarter in quarterly.index:
+        value = mcert.at[quarter]
+        if pd.isna(value):
+            continue
+        if quarter_serial(str(quarter)) < quarter_serial("2026Q1"):
+            previous = float(value)
+            continue
+        if previous is not None and abs(float(value) - previous) > 1e-9:
+            steps.append((str(quarter), round(float(value) - previous, 5)))
+        previous = float(value)
+    expected_serials = [
+        quarter_serial("2028Q1"),
+        quarter_serial("2028Q3"),
+        quarter_serial("2029Q1"),
+        quarter_serial("2029Q3"),
+        *range(quarter_serial("2030Q1"), quarter_serial("2050Q4") + 1, 4),
+    ]
+    assert [quarter_serial(quarter) for quarter, _ in steps] == expected_serials
+    for quarter, size in steps:
+        assert size == pytest.approx(0.05), quarter
+    # No semiannual step survives past 2029Q3: nothing at 2030Q3 or any
+    # later Q3.
+    for quarter, _ in steps[4:]:
+        assert quarter.endswith("Q1"), quarter
+
+
+def test_mcert_catches_published_at_2031q1_then_exceeds_by_1c_per_year(quarterly) -> None:
+    planned = pd.to_numeric(quarterly["planned"], errors="coerce")
+    mcert = pd.to_numeric(quarterly["mcert"], errors="coerce")
+    # Below published up to 2030Q4 (from 2027Q1), equal through calendar
+    # 2031 - bit-identical, so the selected/planned factor is exactly 1.0 -
+    # then above by a further 1c each later calendar year.
+    for quarter in quarterly.index:
+        serial = quarter_serial(str(quarter))
+        if pd.isna(planned.at[quarter]) or serial < quarter_serial("2027Q1"):
+            continue
+        gap = float(mcert.at[quarter]) - float(planned.at[quarter])
+        year = int(str(quarter).split("Q")[0])
+        if serial < quarter_serial("2031Q1"):
+            assert gap < -1e-12, quarter
+        elif year == 2031:
+            assert float(mcert.at[quarter]) == float(planned.at[quarter]), quarter
+        else:
+            assert gap == pytest.approx(0.01 * (year - 2031), abs=1e-9), quarter
+    factors = rate_paths.fed_policy_quarterly_factors(ROOT, "mcert")
+    assert factors["2031Q1"] == 1.0
+    assert factors["2032Q1"] > 1.0
+    assert factors["2029Q3"] == pytest.approx(0.90024 / 0.92024, rel=1e-15)
 
 
 def test_labour_scenario_is_not_the_36_month_staircase_shift(quarterly) -> None:

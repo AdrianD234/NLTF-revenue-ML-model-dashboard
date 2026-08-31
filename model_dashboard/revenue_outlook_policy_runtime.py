@@ -85,13 +85,14 @@ __all__ = [
     "state_id_for",
 ]
 
-# Schema 3 / builder 3: the finite policy catalogue expanded again, from
-# eight x eight (sixty-four materialised states per engine) to twelve x
-# twelve (one hundred and forty-four), adding the four bespoke rate paths
-# (Options 1-4). Packs built at earlier schemas fail closed as stale rather
-# than serving a catalogue that cannot answer the new states.
-POLICY_RUNTIME_SCHEMA_VERSION = "3"
-BUILDER_VERSION = "3"
+# Schema 4 / builder 4: the finite policy catalogue expanded again, from
+# twelve x twelve (one hundred and forty-four materialised states per
+# engine) to thirteen x thirteen (one hundred and sixty-nine), adding the
+# owner-specified MCERT bespoke rate path. Packs built at earlier schemas
+# fail closed as stale rather than serving a catalogue that cannot answer
+# the new states.
+POLICY_RUNTIME_SCHEMA_VERSION = "4"
+BUILDER_VERSION = "4"
 
 _PACK_ROOT = Path("data") / "revenue_outlook_policy_runtime"
 _REBUILD_COMMAND = "python scripts/build_revenue_outlook_policy_runtime.py --all"
@@ -507,8 +508,8 @@ class PolicyRuntime:
     """One engine's materialised policy states, lazily read and memoised.
 
     Holding the decoded frames per state is what makes a repeated selection a
-    dict lookup rather than a parquet read. With the 12x12 catalogue the whole
-    engine no longer safely fits in memory (144 states x 11 frames), so the
+    dict lookup rather than a parquet read. With the 13x13 catalogue the whole
+    engine no longer safely fits in memory (169 states x 11 frames), so the
     memo is BOUNDED: least-recently-inserted frames are evicted once the memo
     exceeds sixteen states' worth. Eviction changes when a frame is re-read
     from its hash-validated parquet, never what it equals.

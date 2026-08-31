@@ -98,7 +98,7 @@ IRAN_WAR_SCENARIO_NOTE = FUEL_PRICE_SCENARIO_NOTE
 # Policy variants are separate replay rows because changing the RUC price
 # input affects activity as well as the nominal revenue rate applied later.
 # One spec per non-published governed state, in registry display order: the
-# six finite deferrals, no-uplift, then the four bespoke rate paths.
+# six finite deferrals, no-uplift, then the five bespoke rate paths.
 _NON_PUBLISHED_POLICY_SPECS = tuple(
     spec for spec in FED_POLICY_SPECS if not spec.is_published
 )

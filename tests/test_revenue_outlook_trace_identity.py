@@ -41,8 +41,8 @@ def test_conflict_registry_has_stable_low_medium_high_identity_and_six_policy_va
     ]
 
     # One variant per non-published governed timing state: the six finite
-    # deferrals, no-uplift, and the four bespoke rate paths, per severity
-    # (33 in total).
+    # deferrals, no-uplift, and the five bespoke rate paths, per severity
+    # (36 in total).
     governed_policy_variants = (
         "delay_6m",
         "delay_12m",
@@ -55,6 +55,7 @@ def test_conflict_registry_has_stable_low_medium_high_identity_and_six_policy_va
         "option2_9c_9c_4c",
         "option3_4c_semiannual",
         "option4_labour_4c",
+        "mcert",
     )
     variants = all_conflict_policy_variants()
     assert [(variant.severity, variant.policy_variant) for variant in variants] == [
@@ -62,7 +63,7 @@ def test_conflict_registry_has_stable_low_medium_high_identity_and_six_policy_va
         for severity in CONFLICT_SEVERITIES
         for policy_variant in governed_policy_variants
     ]
-    assert len({variant.scenario_id for variant in variants}) == 33
+    assert len({variant.scenario_id for variant in variants}) == 36
     for variant in variants:
         assert variant.scenario_id == conflict_policy_variant_name(
             variant.severity,

@@ -216,8 +216,8 @@ def test_no_uplift_spelling_variants_resolve_to_one_state():
 # every legacy pair (the original 3x3), each new duration as Current at a
 # rotating official state, each new duration as the official synthetic
 # counterfactual at rotating Current states, and each bespoke rate path
-# (Options 1-4) on both axes. Local full assurance still runs the exhaustive
-# 144-pair walk.
+# (Options 1-4 and MCERT) on both axes. Local full assurance still runs the
+# exhaustive 169-pair walk.
 REPRESENTATIVE_STATE_PAIRS = (
     *((current, official) for current in ("published", "delayed_6m", "off")
       for official in ("published", "delayed_6m", "off")),
@@ -235,6 +235,8 @@ REPRESENTATIVE_STATE_PAIRS = (
     ("option3_4c_semiannual", "option1_12c_10c_4c"),
     ("option4_labour_4c", "published"),
     ("published", "option4_labour_4c"),
+    ("mcert", "published"),
+    ("published", "mcert"),
 )
 
 
