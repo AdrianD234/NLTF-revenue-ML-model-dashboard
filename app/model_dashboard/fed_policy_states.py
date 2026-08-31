@@ -585,6 +585,36 @@ FED_POLICY_SPECS: tuple[FedPolicySpec, ...] = (
             + _BESPOKE_TRANSMISSION_NOTE
         ),
     ),
+    _bespoke_spec(
+        "mcert",
+        "MCERT — +5c every six months from 1 Jan 2028 for four steps, then +5c annually",
+        BespokeStepSchedule(
+            initial_steps=(
+                ("2028Q1", 0.05),
+                ("2028Q3", 0.05),
+                ("2029Q1", 0.05),
+                ("2029Q3", 0.05),
+            ),
+            recurring_start_period="2030Q1",
+            recurring_interval_quarters=4,
+            recurring_step_nzd_per_litre=0.05,
+        ),
+        order=12,
+        note=(
+            "Bespoke rate path, the owner-specified MCERT scenario (no "
+            "governed source in the repository carries this name or path). "
+            "The 2027 12c/L uplift does not occur; four temporary "
+            "six-monthly +5c/L increases apply on 1 January 2028, 1 July "
+            "2028, 1 January 2029 and 1 July 2029 (the final six-monthly "
+            "step), then +5c/L at every 1 January from 1 January 2030 "
+            "through the governed horizon. Rising +5c/L a year against the "
+            "published staircase's +4c/L, the path catches published timing "
+            "exactly at 2031Q1 and exceeds it by a further 1c/L every later "
+            "year, so below-published and duration-ordering validators "
+            "deliberately do not apply. "
+            + _BESPOKE_TRANSMISSION_NOTE
+        ),
+    ),
 )
 
 _SPEC_BY_STATE_ID = MappingProxyType({spec.state_id: spec for spec in FED_POLICY_SPECS})
@@ -647,7 +677,7 @@ def policy_spec(state: object) -> FedPolicySpec:
 
 
 def policy_state_ids() -> tuple[str, ...]:
-    """The twelve runtime/UI state IDs in display order."""
+    """The thirteen runtime/UI state IDs in display order."""
     return tuple(spec.state_id for spec in FED_POLICY_SPECS)
 
 
@@ -657,7 +687,7 @@ def policy_state_aliases() -> dict[str, str]:
 
 
 def calculation_state_ids() -> tuple[str, ...]:
-    """The twelve calculation-layer state IDs in display order."""
+    """The thirteen calculation-layer state IDs in display order."""
     return tuple(spec.calculation_state_id for spec in FED_POLICY_SPECS)
 
 
@@ -667,14 +697,14 @@ def finite_deferral_specs() -> tuple[FedPolicySpec, ...]:
 
 
 def bespoke_specs() -> tuple[FedPolicySpec, ...]:
-    """The four bespoke step-path states, in display order."""
+    """The five bespoke step-path states, in display order."""
     return tuple(spec for spec in FED_POLICY_SPECS if spec.is_bespoke)
 
 
 def _validate_registry() -> None:
     specs = FED_POLICY_SPECS
-    if len(specs) != 12:
-        raise PolicyStateError(f"Expected exactly 12 policy states, found {len(specs)}.")
+    if len(specs) != 13:
+        raise PolicyStateError(f"Expected exactly 13 policy states, found {len(specs)}.")
     for field in ("state_id", "calculation_state_id", "label", "display_order"):
         values = [getattr(spec, field) for spec in specs]
         if len(set(values)) != len(values):
@@ -700,8 +730,8 @@ def _validate_registry() -> None:
         if len(window) != spec.delay_quarters or window[0] != FED_UPLIFT_START_PERIOD:
             raise PolicyStateError(f"Direct window for {spec.state_id} is malformed: {window}.")
     bespoke = bespoke_specs()
-    if len(bespoke) != 4:
-        raise PolicyStateError(f"Expected exactly 4 bespoke rate paths, found {len(bespoke)}.")
+    if len(bespoke) != 5:
+        raise PolicyStateError(f"Expected exactly 5 bespoke rate paths, found {len(bespoke)}.")
     for spec in bespoke:
         schedule = spec.bespoke_schedule
         if schedule is None:

@@ -8,7 +8,7 @@
     "python": "3.13.15"
   },
   "builder_version": "1",
-  "bytes_on_disk": 4094941,
+  "bytes_on_disk": 4599431,
   "code_module_count": 34,
   "engine": "ar1",
   "frame_count": 35,
@@ -110,7 +110,7 @@
         "official_value",
         "residual_vs_official"
       ],
-      "rows": 11808
+      "rows": 12792
     },
     "fuel.annual_factors": {
       "columns": [
@@ -387,7 +387,7 @@
       "object_columns": [
         "conflict_gdp_reverse_fuel_feedback_applied"
       ],
-      "rows": 14100
+      "rows": 15300
     },
     "fuel.input_audit": {
       "columns": [
@@ -487,7 +487,7 @@
       "index_column": null,
       "index_name": null,
       "object_columns": [],
-      "rows": 46240
+      "rows": 50048
     },
     "fuel.policy_scenario_inputs": {
       "columns": [
@@ -652,7 +652,7 @@
         "conflict_fed_12c_embedded",
         "conflict_gdp_reverse_fuel_feedback_applied"
       ],
-      "rows": 13200
+      "rows": 14400
     },
     "fuel.price_only_replay.assumptions": {
       "columns": [
@@ -817,7 +817,7 @@
         "treasury_macro_applied",
         "conflict_fed_12c_embedded"
       ],
-      "rows": 14602
+      "rows": 15794
     },
     "fuel.price_only_replay.component_forecasts": {
       "columns": [
@@ -920,7 +920,7 @@
         "required_components",
         "missing_artifacts"
       ],
-      "rows": 43757
+      "rows": 47329
     },
     "fuel.price_only_replay.future_forecasts": {
       "columns": [
@@ -1019,7 +1019,7 @@
         "required_components",
         "missing_artifacts"
       ],
-      "rows": 14602
+      "rows": 15794
     },
     "fuel.price_only_replay.structural_component_forecasts": {
       "columns": [],
@@ -1071,7 +1071,7 @@
       "index_column": null,
       "index_name": null,
       "object_columns": [],
-      "rows": 49
+      "rows": 53
     },
     "fuel.price_only_replay_inputs": {
       "columns": [
@@ -1218,7 +1218,7 @@
         "treasury_macro_applied",
         "conflict_fed_12c_embedded"
       ],
-      "rows": 14700
+      "rows": 15900
     },
     "fuel.quarterly_factors": {
       "columns": [
@@ -1437,7 +1437,7 @@
         "conflict_fed_12c_embedded",
         "conflict_gdp_reverse_fuel_feedback_applied"
       ],
-      "rows": 14304
+      "rows": 15496
     },
     "fuel.replay.component_forecasts": {
       "columns": [
@@ -1769,7 +1769,7 @@
         "required_components",
         "missing_artifacts"
       ],
-      "rows": 14304
+      "rows": 15496
     },
     "fuel.replay.structural_component_forecasts": {
       "columns": [
@@ -1833,7 +1833,7 @@
       "object_columns": [
         "component_weight"
       ],
-      "rows": 56024
+      "rows": 60792
     },
     "fuel.replay.superseded_component_forecasts": {
       "columns": [
@@ -1942,7 +1942,7 @@
         "required_components",
         "missing_artifacts"
       ],
-      "rows": 41971
+      "rows": 45543
     },
     "fuel.replay.validation_report": {
       "columns": [
@@ -2010,7 +2010,7 @@
       "index_column": null,
       "index_name": null,
       "object_columns": [],
-      "rows": 48
+      "rows": 52
     },
     "fuel.replay_inputs": {
       "columns": [
@@ -2175,7 +2175,7 @@
         "conflict_fed_12c_embedded",
         "conflict_gdp_reverse_fuel_feedback_applied"
       ],
-      "rows": 14400
+      "rows": 15600
     },
     "fuel.treasury_base_inputs": {
       "columns": [
@@ -2913,30 +2913,30 @@
     }
   },
   "output_hashes": {
-    "fuel.annual_bridge.parquet": "112fbda61c0d580c2c277e2260681b8f8a2fcff8d2eaf5d7945062843524af6f",
+    "fuel.annual_bridge.parquet": "6ba9ed3e037e5d7804a1123043efaf88169f462502660285419b32ff5c706e65",
     "fuel.annual_factors.parquet": "f72450f11e5bba0ec3f8e4acd951fbf18aadde5ce5a872f802ef9bf83236bce9",
     "fuel.baseline_macro_annual_factors.parquet": "bf1660e0d5ccb63c56c675aa3a03361fcbe6a3b857d7637f3b4b328281f56ca3",
     "fuel.baseline_macro_quarterly_factors.parquet": "b36480dbfcfca7fb63386992ac87efa10fd90fb8508461ba0f8aec0e80a3e575",
     "fuel.fuel_scenario_inputs.parquet": "fca63f0a8918bed34432dd0615de92a44e208ba20a62fbf7340034731f8a2508",
-    "fuel.gdp_input_audit.parquet": "cea41cb3707ab741ed6051c6da69e40a5074f5689cf0c16a46bd7b42fbf299c9",
+    "fuel.gdp_input_audit.parquet": "99807dfed88997da8a8554741eb5da23304e307e23d65004e7057c5293a9ccb6",
     "fuel.input_audit.parquet": "9a70ea1cb29db129f5835f1296e5d7d77b3520830f4480cb768746b8eef08557",
-    "fuel.policy_pair_factors.parquet": "4dbe524a9781832eabd3a0ab1112f9fb8ef45ba5129e10d3f9e9ba064718370c",
-    "fuel.policy_scenario_inputs.parquet": "9ed2a8b17b8c8a87946de7626b6504c90a9bb36d58dd3f7f60ef3abbde2ddd0f",
-    "fuel.price_only_replay.assumptions.parquet": "bf0b8f147940f806bdffe88ac2209f76b045e531f3bd0489b5a71446c25d60a9",
-    "fuel.price_only_replay.component_forecasts.parquet": "6d2743821e0f10777510d5022eb289b4f25d1a4224bdac15c94f43cdb3491ef2",
-    "fuel.price_only_replay.future_forecasts.parquet": "23fee378b80cb184b8a1da9637000c9ee092428fef7f6171df7bc2aa9b74d7be",
+    "fuel.policy_pair_factors.parquet": "94303b1f8c5bf44985e122d04d0b523bf585e88e7fefa3af2ffc90817775a09c",
+    "fuel.policy_scenario_inputs.parquet": "9da4007b3a62769dcdec15ed237401e3966e9381817a83b35f2236b18276e122",
+    "fuel.price_only_replay.assumptions.parquet": "635435101721259d713fb1671b69284dd1c0a9b635475c4fde4e70d40fd0bd1a",
+    "fuel.price_only_replay.component_forecasts.parquet": "67ea1b3bbcb01e3182a2334ccfd2db9aa9bd000610769ad44068d0284850314f",
+    "fuel.price_only_replay.future_forecasts.parquet": "cf84711a5c0eff49a3286981670d88be45b4a1944aaf0981957a48715da5e727",
     "fuel.price_only_replay.structural_component_forecasts.parquet": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9",
     "fuel.price_only_replay.superseded_component_forecasts.parquet": "8b6e33d47f4e1df33f587d9b1d420f756a6c705b8496e0912c223c5d83371df9",
-    "fuel.price_only_replay.validation_report.parquet": "2e5880976ef352d79762d5a0992837c05385c5ffdb4199a836bbdb75c9797cd1",
-    "fuel.price_only_replay_inputs.parquet": "b10837eb48af0248e365a41e0671d61ed6cd1b88fd66fece05c4bb368a6c5b4e",
+    "fuel.price_only_replay.validation_report.parquet": "4804477cba64addb6a375ede5b61b38a5a933dc8162f193dc362a680afcab3cb",
+    "fuel.price_only_replay_inputs.parquet": "fdebf3a5a157c5974ad9fdee567232ed70b900a343bce1a03a566715e85246ed",
     "fuel.quarterly_factors.parquet": "3908fe3078994d4366bed7419ecc8c625ffd67e42711fd4c021e25d8e9b46168",
-    "fuel.replay.assumptions.parquet": "df691dc87f0c6f87b0e2aa8c6b3effaa32a1871fd1cf695d6776623e6192dfb3",
+    "fuel.replay.assumptions.parquet": "25677507431cc1f9da342fcb6d880ce70bb629e91ae61cfe7d65b081c6b0c141",
     "fuel.replay.component_forecasts.parquet": "7b9312ecf61a8c41ecb4fb8d2703f1b8b6360739b28920558716e0f370676787",
-    "fuel.replay.future_forecasts.parquet": "53b51fdb0f55549c05d0a384fb94712954fe38d3c80152f1b3af77234888566e",
-    "fuel.replay.structural_component_forecasts.parquet": "ac6525a1816c7c920c8956d47e8c17e024b7b606eb3e3d338bcabea49beb8528",
-    "fuel.replay.superseded_component_forecasts.parquet": "e65d3d881486aaf2a7a8fb1d3aeb8fadfc2408c620710e45df44ccc3b326f10b",
-    "fuel.replay.validation_report.parquet": "d96a3309f37d795769b57faebf45ee85f2e800ee386b0474cf0fb69143f6e3ba",
-    "fuel.replay_inputs.parquet": "ad92e9ecbc853433690f29bf5410f5f3b4efc50bc7553d197a5e077be488afcb",
+    "fuel.replay.future_forecasts.parquet": "04aafd133e4e7d7379bb0bd31fb0684df5ec20d86f318dee41af36efb149ab6a",
+    "fuel.replay.structural_component_forecasts.parquet": "c966ee9fcd9180215784cdc0f82c032849ef5c05be1fd57c65c7c772502d0a21",
+    "fuel.replay.superseded_component_forecasts.parquet": "b718e5558147487f9b485b4f762b85d0d749f3ef279be1e68b92975b5a593b61",
+    "fuel.replay.validation_report.parquet": "5145796df9f87141e2fe4d9d6a677aaceff01576851ecd61701913bbfc9cf180",
+    "fuel.replay_inputs.parquet": "c1afc68e7ed4fd78575e90ab9e27f3d68a98542b2f7ed40a24bb24b9770e736e",
     "fuel.treasury_base_inputs.parquet": "b044faceb07144d42d84af21923ee3c5c5c92ba9ba0dd5847af21d52bda75014",
     "macro.baseline_macro_annual_factors.parquet": "42297de3380f9541e5f7ad9a4bf60df202da429ad734434803cd843ab0ab0c17",
     "macro.baseline_macro_quarterly_factors.parquet": "e7d29a26bb949694bf95a83824e71d6b3e19127784c2887e10ca36843bb5d19e",
@@ -2955,15 +2955,15 @@
     "code_module_hashes": {
       "model_dashboard/__init__.py": "40f18fc5bbc37948a1250097bb55c68711d51d6622248e75efe27cd3580809f8",
       "model_dashboard/completeness_contract.py": "2a5ec576c757b7d4d820a060922dd5c7c7275841dc9734dcb479f9ad49a5c708",
-      "model_dashboard/conflict_fuel_paths.py": "dc6476d0d4b9354904f5c545d13bf01f5fa970f20bb93c09db0a8c210f532c33",
+      "model_dashboard/conflict_fuel_paths.py": "11fe97f6ef11a6c8545308a6a717d2c911e3e950309c6488c009de1f7d355078",
       "model_dashboard/conflict_gdp_paths.py": "418a549da02d7fb719da070c12857ce37366cee815e4283e4492dbacf0f8ccf9",
       "model_dashboard/engine.py": "9bffa6e6493cc20c13ca0f2efd9924fcb81da61d713725b41ccdbdab71914d7a",
       "model_dashboard/ev_uptake_levers.py": "ab4520eff520c2d5ce65faa4a02921e87445be515056d8a56d79170d0d277d73",
-      "model_dashboard/fed_policy_states.py": "23c7cb39c83ae204aa222bdc3b5583073b6b4e4e0910696c3bcb1a33f475881a",
+      "model_dashboard/fed_policy_states.py": "a76f636cffb203148f989221c6d9be136153403372fc0b788005d252438b243c",
       "model_dashboard/forecast_imports.py": "d39fd287ab25d874ef1824618a3bc9027904aa6dea1718d16414670742780a15",
       "model_dashboard/forecast_runner.py": "123330cc285881ab042cee4231ebd57dffca6ce236f39fc28687385c8cf4644d",
       "model_dashboard/forward_scorer_governance.py": "044a83f4c50b51de90f1185dcb1d7f44f8b087d349078ee993c5af5d36d692fc",
-      "model_dashboard/fuel_price_scenario.py": "6e5b070c32b89570408ed9c180fd2261abd9bd2be68f86ece6d3eaf1fc0b0b64",
+      "model_dashboard/fuel_price_scenario.py": "e3e356ec992ff89e3c7f9c9d116361f8fa7fbbbecf4836ac1928e3d5283cd93f",
       "model_dashboard/governance_constants.py": "00b9e3a41aedbbe2dd51c0d5c4d9cb82696e2d63a284dff1f88d477dd5338568",
       "model_dashboard/heavy_ruc_forward.py": "9ab8ff4ed010b652fbb467dfbe9672085bfe0324e69a21e7770de98ed4fb3e29",
       "model_dashboard/light_fleet_allocation.py": "c997ccc283eb3a54a91f1c5ec009b02de35d1b1e6be03e04aeaa502479c39d37",
@@ -2973,7 +2973,7 @@
       "model_dashboard/ped_forward.py": "92c3b5324ae798956679820a4e0b23314f2134a259c4b973d58640e6329325fa",
       "model_dashboard/post_model_extrapolation.py": "9c5171e058f7044e14f275a3b164d0ab1105b85e05a50072a3d457930e0a4d0e",
       "model_dashboard/rate_paths.py": "07de7e85e0bd8980ee30f8db6de941fa7c6e543ecbd3d1bd4f80a1c345b85d4d",
-      "model_dashboard/revenue_outlook.py": "399ae6021166c82606979b14642c2653457b34886b607b085e181d0cff149557",
+      "model_dashboard/revenue_outlook.py": "52a1d25440b9c7c59f92a00208b952a014d4e43bae3cdce5d274c6e229c1b988",
       "model_dashboard/revenue_outlook_replay_cache.py": "f24ea4013bb9169612a8d63008fb1ded2626bf780c272df6270fcbd6705eb518",
       "model_dashboard/revenue_source_pack.py": "61b9fd2b06d4c16add928656b9bd6e5cda9dcb38b0f3d9a0f60fb5c1e2cf8c9c",
       "model_dashboard/scenario_inputs.py": "f035a3da1e995550565f968f1f0ff2f5ee438bd5217f91440f6542b2882f8f29",
@@ -3913,7 +3913,7 @@
       "data/vfm_202405/vfm_vkt_shares.csv": "81da2535b316245182abc416d1e43a418888eb9ff986b8f663b636a6e375abe8"
     }
   },
-  "row_count": 327402,
+  "row_count": 353682,
   "scalars": {
     "fuel.base_scenario_name": "current_basecase",
     "macro.base_scenario_name": "current_basecase",
@@ -3923,6 +3923,6 @@
     ]
   },
   "schema_version": "1",
-  "source_digest": "0a1c45aa6a77d4b8196ff00a1668a0cf5fa36ff70162dc5a409dc69294df3d6c",
-  "source_main_sha": "b497c514eed2f76b66771312007d1ec11cc0df68"
+  "source_digest": "6466b7291ed1a7b7cedc6cdbfb7ea2926c55a0bfe91e0d6ab384dc9c9b77c7b7",
+  "source_main_sha": "d4d81b3683c5c0551ec78597971dd4c9a4b596b1"
 }
