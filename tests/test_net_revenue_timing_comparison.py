@@ -97,13 +97,13 @@ def test_net_ruc_alias_and_active_net_definitions_are_explicit() -> None:
     assert app._revenue_outlook_series_display_label("Total RUC all classes") == "Net RUC revenue (all classes)"
 
 
-def test_forty_eight_path_net_revenue_matrix_is_complete_unique_and_registry_driven(
+def test_fifty_two_path_net_revenue_matrix_is_complete_unique_and_registry_driven(
     timing_materialization,
 ) -> None:
     comparison = timing_materialization["comparison"]
     assert isinstance(comparison, pd.DataFrame)
-    # 48 paths x 5 fiscal years x 3 series.
-    assert len(comparison) == 720
+    # 52 paths x 5 fiscal years x 3 series.
+    assert len(comparison) == 780
     assert not comparison.duplicated(["path_id", "FY", "series_id"]).any()
     assert comparison["path_id"].drop_duplicates().tolist() == list(ALL_POLICY_PATH_IDS)
     assert all(
@@ -114,7 +114,7 @@ def test_forty_eight_path_net_revenue_matrix_is_complete_unique_and_registry_dri
             strict=True,
         )
     )
-    assert comparison["path_order"].drop_duplicates().tolist() == list(range(48))
+    assert comparison["path_order"].drop_duplicates().tolist() == list(range(52))
     assert comparison["scenario_family_id"].drop_duplicates().tolist() == [
         "base",
         *CONFLICT_SEVERITIES,

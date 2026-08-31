@@ -405,6 +405,7 @@ def test_leakage_applies_only_to_the_newly_transitioned_base(
         "option1_12c_10c_4c",
         "option3_4c_semiannual",
         "option4_labour_4c",
+        "mcert",
     ],
 )
 def test_composes_with_representative_timing_states(schedule, policy_state) -> None:

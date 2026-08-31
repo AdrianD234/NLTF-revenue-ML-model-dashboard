@@ -450,6 +450,27 @@ def _worst_deviation(left: pd.DataFrame, right: pd.DataFrame) -> tuple[float, fl
         both = ~(np.isnan(a) | np.isnan(b))
         if not both.any():
             continue
+        if column.endswith("_tolerance_ratio"):
+            # Dimensionless closure diagnostics: a residual divided by its own
+            # rtol/atol envelope, with <= 1.0 the governed pass criterion.
+            # The envelope is many orders of magnitude below a display unit,
+            # so dividing sanctioned cross-environment float noise by it
+            # amplifies bit-level non-reproducibility to the value bound's
+            # scale (a ~1e-12 residual over a ~1e-8 envelope reads as 1e-4).
+            # These columns are therefore compared at their own semantics:
+            # both environments must agree on the pass verdict cell-by-cell.
+            # A verdict flip is a real failure; matching verdicts deep inside
+            # the criterion are agreement, whatever the raw ratios read.
+            flip = (a[both] <= 1.0) != (b[both] <= 1.0)
+            worst_abs = max(worst_abs, float(np.abs(a[both] - b[both]).max()))
+            if flip.any():
+                index = int(np.argmax(flip))
+                return (
+                    float("inf"),
+                    float("inf"),
+                    f"{column}: pass-verdict flip {a[both][index]!r} vs {b[both][index]!r}",
+                )
+            continue
         absolute = np.abs(a[both] - b[both])
         allowed = _CROSS_ENVIRONMENT_ATOL + _CROSS_ENVIRONMENT_RTOL * np.abs(b[both])
         excess = absolute - allowed
@@ -519,6 +540,34 @@ def test_cross_environment_bound_accepts_summation_noise_and_rejects_real_change
         changed.loc[index, "value"] = changed_value
         _, worst_excess, where = _worst_deviation(changed, reference)
         assert worst_excess > 0.0, f"a real change was absorbed by the bound ({where})"
+
+    # Closure-ratio diagnostics compare at their own semantics: the governed
+    # pass criterion (<= 1.0), never the display-unit bound. The pinned pair
+    # is the case CI actually produced - a residual of ~1e-4 of the envelope
+    # on one platform against an exact 0.0 on the other, both passing by four
+    # orders of magnitude - which must be agreement, while a verdict flip
+    # across the criterion must fail however small the numeric gap.
+    ratio_reference = pd.DataFrame(
+        {"policy_post_calibration_component_closure_tolerance_ratio": [0.0, 0.5, 0.999]}
+    )
+    ratio_noise = pd.DataFrame(
+        {
+            "policy_post_calibration_component_closure_tolerance_ratio": [
+                0.00011240976820263459,
+                0.5 + 3e-4,
+                0.999,
+            ]
+        }
+    )
+    _, worst_excess, where = _worst_deviation(ratio_noise, ratio_reference)
+    assert worst_excess <= 0.0, (
+        f"matching pass verdicts on a closure ratio must be agreement ({where})"
+    )
+    ratio_flip = ratio_reference.copy()
+    ratio_flip.loc[2, "policy_post_calibration_component_closure_tolerance_ratio"] = 1.001
+    _, worst_excess, where = _worst_deviation(ratio_flip, ratio_reference)
+    assert worst_excess > 0.0, f"a pass-verdict flip was absorbed ({where})"
+    assert "pass-verdict flip" in where
 
 
 @pytest.mark.slow

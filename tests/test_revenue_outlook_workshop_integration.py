@@ -457,6 +457,7 @@ def test_an_unknown_policy_selection_is_dropped_not_coerced() -> None:
         "option2_9c_9c_4c",
         "option3_4c_semiannual",
         "option4_labour_4c",
+        "mcert",
     ],
 )
 def test_a_live_policy_selection_survives(state: str) -> None:

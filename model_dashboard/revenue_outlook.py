@@ -973,9 +973,9 @@ def net_revenue_timing_comparison_frame(
             for level in CONFLICT_FUEL_SCENARIO_LEVELS
         ),
     )
-    # Registry-driven: all twelve governed timing states per family, in
+    # Registry-driven: all thirteen governed timing states per family, in
     # display order (published, the six finite deferrals, no uplift, then
-    # the four bespoke rate paths).
+    # the five bespoke rate paths).
     timing_specs = tuple(
         (spec.timing_id, spec.calculation_state_id, spec.timing_label, spec)
         for spec in FED_POLICY_SPECS
