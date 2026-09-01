@@ -8195,13 +8195,11 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
         # preserved; coefficient chains for the linear pieces, exact imported
         # component predictions for the tree pieces). Current-model central
         # path only; other selections state why they are unsupported.
-        glassbox_trace = (
-            GLASSBOX_SUPPORTED_TRACE
-            if GLASSBOX_SUPPORTED_TRACE in tuple(selected_traces)
-            else ""
-        )
+        # The workbook always targets the central view (the Current
+        # conditions baseline trace), whether or not that layer is ticked in
+        # the chart picker - the overlay rows always carry it.
         glassbox_refusal = glassbox_supported_selection(
-            trace_name=glassbox_trace,
+            trace_name=GLASSBOX_SUPPORTED_TRACE,
             engine=engine,
             uptake_basis=selected_ev_uptake_mode,
             custom_ev_levers=custom_ev_levers,

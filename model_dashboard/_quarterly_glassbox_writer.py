@@ -403,21 +403,31 @@ def _write_inputs_sheet(grid: _SheetGrid, data, *, audit_sheets: bool) -> None:
             row += 1
     row += 1
 
-    _section_header(grid, row, "Selected rate-path pricing - committed pump and rate paths")
+    _section_header(grid, row, "Selected scenario pricing - committed reference and selected price paths")
     row += 1
-    for key, label in (
-        ("policy_free_source_nominal_petrol_cpl", "Policy-free nominal petrol price (c/L)"),
-        ("policy_published_fed_wedge_nominal_cpl", "Published FED wedge (c/L)"),
-        ("policy_source_nominal_petrol_cpl", "Reference nominal pump price (c/L)"),
-        ("policy_target_nominal_petrol_cpl", "Selected-path nominal pump price (c/L)"),
+    _set_label(
+        grid, row,
+        "Reference = the central base-case price path; selected = this "
+        "scenario's path (conflict conditions plus the selected 12c rate "
+        "path). The demand response uses the ratio of the two.",
+        font=styles.note,
+    )
+    row += 1
+    for stream, stream_label, unit in (
+        ("PED", "Petrol pump price", "c/L real"),
+        ("LIGHT_RUC", "Light RUC running cost", "$/1,000 km"),
+        ("HEAVY_RUC", "Heavy RUC running cost", "$/1,000 km"),
     ):
-        values = data.policy.ped_nominal.get(key)
-        if not values:
-            continue
-        grid.register(f"in.{key}", row)
-        _set_label(grid, row, label)
-        _paint_quarters(grid, row, values, font=styles.input, number_format=_NF_VALUE2)
-        row += 1
+        for kind, kind_label in (("reference", "reference"), ("variant", "selected")):
+            values = (
+                data.policy.reference_price if kind == "reference" else data.policy.variant_price
+            ).get(stream, {})
+            if not values:
+                continue
+            grid.register(f"in.price.{stream}.{kind}", row)
+            _set_label(grid, row, f"{stream_label} - {kind_label} ({unit})")
+            _paint_quarters(grid, row, values, font=styles.input, number_format=_NF_VALUE2)
+            row += 1
     for stream, stream_label in (("LIGHT_RUC", "Light RUC"), ("HEAVY_RUC", "Heavy RUC")):
         detail = data.policy.ruc_detail.get(stream, {})
         for key, label in (
@@ -729,19 +739,6 @@ def _write_params_sheet(grid: _SheetGrid, data, defined_names: dict[str, str]) -
              f"{data.bridge_vintage_id} official: {display_name(data, series_id)}",
              {fy: v for fy, v in data.official_spine.get(series_id, {}).items() if 2026 <= fy <= 2050},
              _NF_VALUE, True)
-        )
-    for series_id in (
-        "ped_vkt_per_capita", "light_petrol_vkt", "light_ruc_net_km",
-        "light_bev_ruc_net_km", "phev_ruc_net_km", "heavy_ruc_net_km",
-        "gross_ped_revenue", "total_ruc_net_revenue",
-    ):
-        annual_tables.append(
-            (
-                f"prm.pair_factor.{series_id}",
-                f"Rate-path activity factor FY2026-FY2030: {display_name(data, series_id)}",
-                data.policy.annual_pair_factor.get(series_id, {}),
-                "0.0000", False,
-            )
         )
     for key, label, values, number_format, skip_zero in annual_tables:
         grid.register(key, row)
@@ -1096,99 +1093,76 @@ def _write_scenario_sheet(grid: _SheetGrid, data) -> None:
     _set_label(
         grid, row,
         f"Selected path: {data.policy.state_label}. Calibrated activity = raw "
-        "reference forecast x (price ratio) ^ elasticity x GDP factor. Central "
-        "baseline: GDP factor = 1. Beyond FY2030 the displayed activity carries "
-        "no rate-path demand response; revenue carries the governed rate ratio.",
+        "reference forecast x (combined price ratio) ^ elasticity x GDP factor. "
+        "The ratio combines the scenario's conflict conditions and the selected "
+        "12c rate path against the central reference prices; the GDP factor is "
+        "the governed conflict transmission. Beyond FY2030 the displayed "
+        "activity carries no scenario demand response; revenue carries the "
+        "governed rate ratio.",
         font=styles.note,
     )
     row += 1
 
-    _set_label(grid, row, "PED - total pump-price basis", font=styles.subhead)
-    row += 1
-    ped_free_row = data._inputs_grid.row("in.policy_free_source_nominal_petrol_cpl")
-    ped_wedge_row = data._inputs_grid.row("in.policy_published_fed_wedge_nominal_cpl")
-    ped_target_row = data._inputs_grid.row("in.policy_target_nominal_petrol_cpl")
-    grid.register("pol.ped.reference_pump", row)
-    _set_label(grid, row, "Reference nominal pump price = policy-free + published wedge", indent=1)
-    _formula_quarters(
-        grid, row,
-        f"='{inputs_sheet}'!{{c}}{ped_free_row}+'{inputs_sheet}'!{{c}}{ped_wedge_row}",
-        font=styles.link, number_format=_NF_VALUE2, quarters=ped_quarters,
+    stream_meta = (
+        ("PED", "ped.raw_level", "PED_Elas", "PED",
+         "pump-price basis (c/L real)", ped_quarters),
+        ("LIGHT_RUC", "light.raw_mkm", "LR_Elas", "Light RUC",
+         "generalized running-cost basis ($/1,000 km)", light_quarters),
+        ("HEAVY_RUC", "heavy.raw_mkm", "HR_Elas", "Heavy RUC",
+         "generalized running-cost basis ($/1,000 km)", heavy_quarters),
     )
-    row += 1
-    grid.register("pol.ped.target_pump", row)
-    _set_label(grid, row, "Selected-path nominal pump price (committed)", indent=1)
-    _formula_quarters(grid, row, f"='{inputs_sheet}'!{{c}}{ped_target_row}",
-                      font=styles.link, number_format=_NF_VALUE2, quarters=ped_quarters)
-    row += 1
-    grid.register("pol.ped.ratio", row)
-    _set_label(grid, row, "Pump-price ratio = selected / reference", indent=1)
-    ref_row = grid.row("pol.ped.reference_pump")
-    tgt_row = grid.row("pol.ped.target_pump")
-    _formula_quarters(grid, row, f"={{c}}{tgt_row}/{{c}}{ref_row}",
-                      font=styles.formula, number_format="0.0000", quarters=ped_quarters)
-    row += 1
-    grid.register("pol.ped.factor", row)
-    _set_label(grid, row, "Price-response factor = ratio ^ ε PED", indent=1)
-    ratio_row = grid.row("pol.ped.ratio")
-    _formula_quarters(grid, row, f"={{c}}{ratio_row}^PED_Elas",
-                      font=styles.formula, number_format="0.0000", quarters=ped_quarters)
-    row += 1
-    grid.register("pol.ped.calibrated", row)
-    _set_label(grid, row, "Calibrated PED VKT per capita (km)", font=styles.label_bold, indent=1)
-    raw_row = grid.row("ped.raw_level")
-    factor_row = grid.row("pol.ped.factor")
-    _formula_quarters(grid, row, f"={{c}}{raw_row}*{{c}}{factor_row}",
-                      font=styles.formula_bold, number_format=_NF_KM, quarters=ped_quarters)
-    row += 2
-
-    for stream, raw_key, elasticity_name, label in (
-        ("LIGHT_RUC", "light.raw_mkm", "LR_Elas", "Light RUC"),
-        ("HEAVY_RUC", "heavy.raw_mkm", "HR_Elas", "Heavy RUC"),
-    ):
-        _set_label(grid, row, f"{label} - generalized running-cost basis", font=styles.subhead)
+    for stream, raw_key, elasticity_name, label, basis, stream_quarters in stream_meta:
+        _set_label(grid, row, f"{label} - {basis}", font=styles.subhead)
         row += 1
-        stream_quarters = light_quarters if stream == "LIGHT_RUC" else heavy_quarters
-        ref_fuel = data._inputs_grid.row(f"in.{stream}.reference_fuel_cost")
-        var_fuel = data._inputs_grid.row(f"in.{stream}.variant_fuel_cost")
-        ref_ruc = data._inputs_grid.row(f"in.{stream}.reference_ruc_price")
-        var_ruc = data._inputs_grid.row(f"in.{stream}.variant_ruc_price")
-        grid.register(f"pol.{stream}.reference_cost", row)
-        _set_label(grid, row, "Reference cost ($/1,000 km) = diesel cost + RUC rate", indent=1)
-        _formula_quarters(
-            grid, row,
-            f"='{inputs_sheet}'!{{c}}{ref_fuel}+'{inputs_sheet}'!{{c}}{ref_ruc}",
-            font=styles.link, number_format=_NF_VALUE2, quarters=stream_quarters,
-        )
-        row += 1
-        grid.register(f"pol.{stream}.variant_cost", row)
-        _set_label(grid, row, "Selected cost ($/1,000 km) = diesel cost + selected RUC rate", indent=1)
-        _formula_quarters(
-            grid, row,
-            f"='{inputs_sheet}'!{{c}}{var_fuel}+'{inputs_sheet}'!{{c}}{var_ruc}",
-            font=styles.link, number_format=_NF_VALUE2, quarters=stream_quarters,
-        )
-        row += 1
+        if stream in data.policy.ruc_detail:
+            detail = data.policy.ruc_detail[stream]
+            for key, sub_label in (
+                ("reference_fuel_cost", "Reference diesel cost ($/1,000 km)"),
+                ("variant_fuel_cost", "Selected diesel cost ($/1,000 km)"),
+                ("reference_ruc_price", "Reference RUC rate ($/1,000 km)"),
+                ("variant_ruc_price", "Selected RUC rate ($/1,000 km)"),
+            ):
+                values = detail.get(key)
+                if not values:
+                    continue
+                grid.register(f"pol.{stream}.{key}", row)
+                _set_label(grid, row, sub_label, indent=2)
+                _paint_quarters(grid, row, values, font=styles.input,
+                                number_format=_NF_VALUE2, quarters=stream_quarters)
+                row += 1
+        ref_row = data._inputs_grid.row(f"in.price.{stream}.reference")
+        var_row = data._inputs_grid.row(f"in.price.{stream}.variant")
         grid.register(f"pol.{stream}.ratio", row)
-        _set_label(grid, row, "Running-cost ratio = selected / reference", indent=1)
-        rc = grid.row(f"pol.{stream}.reference_cost")
-        vc = grid.row(f"pol.{stream}.variant_cost")
-        _formula_quarters(grid, row, f"={{c}}{vc}/{{c}}{rc}",
-                          font=styles.formula, number_format="0.0000", quarters=stream_quarters)
+        _set_label(grid, row, "Price ratio = selected / reference", indent=1)
+        _formula_quarters(
+            grid, row,
+            f"='{inputs_sheet}'!{{c}}{var_row}/'{inputs_sheet}'!{{c}}{ref_row}",
+            font=styles.link, number_format="0.0000", quarters=stream_quarters,
+        )
         row += 1
         grid.register(f"pol.{stream}.factor", row)
-        symbol = "ε Light RUC" if stream == "LIGHT_RUC" else "ε Heavy RUC"
-        _set_label(grid, row, f"Price-response factor = ratio ^ {symbol}", indent=1)
+        _set_label(grid, row, f"Price-response factor = ratio ^ ε {label}", indent=1)
         rr = grid.row(f"pol.{stream}.ratio")
         _formula_quarters(grid, row, f"={{c}}{rr}^{elasticity_name}",
                           font=styles.formula, number_format="0.0000", quarters=stream_quarters)
         row += 1
-        grid.register(f"pol.{stream}.calibrated_mkm", row)
-        _set_label(grid, row, f"Calibrated {label} activity (m km)", font=styles.label_bold, indent=1)
+        grid.register(f"pol.{stream}.gdp_factor", row)
+        _set_label(grid, row, "GDP factor (committed; conflict transmission, 1 = neutral)", indent=1)
+        _paint_quarters(grid, row, data.policy.gdp_factor.get(stream, {}),
+                        font=styles.input, number_format="0.0000", quarters=stream_quarters)
+        row += 1
+        calibrated_key = "pol.ped.calibrated" if stream == "PED" else f"pol.{stream}.calibrated_mkm"
+        unit = "(km)" if stream == "PED" else "(m km)"
+        grid.register(calibrated_key, row)
+        _set_label(grid, row, f"Calibrated {label} activity {unit} = raw x price factor x GDP factor",
+                   font=styles.label_bold, indent=1)
         raw_row_s = grid.row(raw_key)
         fr = grid.row(f"pol.{stream}.factor")
-        _formula_quarters(grid, row, f"={{c}}{raw_row_s}*{{c}}{fr}",
-                          font=styles.formula_bold, number_format=_NF_VALUE, quarters=stream_quarters)
+        gr = grid.row(f"pol.{stream}.gdp_factor")
+        number_format = _NF_KM if stream == "PED" else _NF_VALUE
+        _formula_quarters(grid, row, f"={{c}}{raw_row_s}*{{c}}{fr}*{{c}}{gr}",
+                          font=styles.formula_bold, number_format=number_format,
+                          quarters=stream_quarters)
         row += 2
 
     data._scenario_row_cursor = row

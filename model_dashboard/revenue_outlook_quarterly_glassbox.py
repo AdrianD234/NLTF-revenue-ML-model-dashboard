@@ -68,8 +68,12 @@ GLASSBOX_LAST_QUARTER = "2050Q2"
 #: v1 scope: the central Current-model path only. Conflict reforecasts, the
 #: High-population comparison, official vintages and the PREBU deferral
 #: workbook are declared out of scope rather than approximated.
-GLASSBOX_SUPPORTED_TRACE = "Current finalist Base case"
+#: The dashboard's central view: the "Current conditions baseline" trace
+#: (the Low conflict-severity path re-labelled as current conditions). Its
+#: committed replay scenarios are the middle_east_low family.
+GLASSBOX_SUPPORTED_TRACE = "Current conditions baseline"
 GLASSBOX_LAST_ACTUAL_QUARTER = "2025Q2"
+_SCENARIO_PREFIX = "middle_east_low"
 GLASSBOX_SUPPORTED_ENGINE = ENGINE_AR1
 _BASE_SCENARIO = "current_basecase"
 
@@ -311,16 +315,20 @@ def _replay_frame(repo_root: Path, engine: str, name: str) -> pd.DataFrame:
 
 
 def _policy_scenario_name(policy_state: str) -> str:
-    """The committed replay scenario for the central path under one 12c state."""
+    """The committed replay scenario for the central view under one 12c state.
+
+    The Current conditions baseline is the middle_east_low family; its policy
+    variants join with a double underscore (middle_east_low__mcert).
+    """
     state = str(policy_state).strip()
     if state in ("", "published"):
-        return _BASE_SCENARIO
+        return _SCENARIO_PREFIX
     if state == "off":
-        return f"{_BASE_SCENARIO}_12c_no_uplift"
+        return f"{_SCENARIO_PREFIX}__12c_no_uplift"
     if state.startswith("delayed_"):
         months = state.removeprefix("delayed_")
-        return f"{_BASE_SCENARIO}_12c_delay_{months}"
-    return f"{_BASE_SCENARIO}_{state}"
+        return f"{_SCENARIO_PREFIX}__12c_delay_{months}"
+    return f"{_SCENARIO_PREFIX}__{state}"
 
 
 def _scenario_stream_frame(
@@ -431,6 +439,7 @@ class _PolicyOverlay:
     pair_id: str
     elasticity: dict[str, float]  # stream -> governed Med elasticity
     price_ratio: dict[str, dict[str, float]]  # stream -> quarter -> ratio
+    gdp_factor: dict[str, dict[str, float]]  # stream -> quarter -> GDP factor
     reference_price: dict[str, dict[str, float]]
     variant_price: dict[str, dict[str, float]]
     calibrated: dict[str, dict[str, float]]  # stream -> quarter -> displayed forecast
@@ -534,21 +543,34 @@ def _template_row_labels(template_path: Path) -> dict[int, str]:
 def _annual_value_lookup(
     value_frames: Sequence[pd.DataFrame], trace_name: str
 ) -> dict[str, dict[int, float]]:
-    """series -> FY -> value with first-frame-wins precedence (extract rule)."""
+    """series -> FY -> value with first-frame-wins precedence (extract rule).
+
+    History years fall back to the Base-case source path exactly as the
+    annual extract does: FY2001-FY2024 history is scenario-invariant and the
+    committed pack stack carries it under that path only.
+    """
+    from model_dashboard.revenue_outlook_excel_extract import (
+        HISTORY_FALLBACK_SOURCE_PATH,
+    )
+
     out: dict[str, dict[int, float]] = {}
-    for frame in value_frames:
-        if frame is None or frame.empty:
-            continue
-        required = {"source_path", "series_id", "FY", "value"}
-        if not required.issubset(frame.columns):
-            continue
-        scoped = frame[frame["source_path"].astype(str).eq(trace_name)]
-        for row in scoped.itertuples():
-            fy = pd.to_numeric(pd.Series([row.FY]), errors="coerce").iloc[0]
-            value = pd.to_numeric(pd.Series([row.value]), errors="coerce").iloc[0]
-            if pd.isna(fy) or pd.isna(value):
+    for paths in ((trace_name,), (HISTORY_FALLBACK_SOURCE_PATH,)):
+        history_only = paths[0] != trace_name
+        for frame in value_frames:
+            if frame is None or frame.empty:
                 continue
-            out.setdefault(str(row.series_id), {}).setdefault(int(fy), float(value))
+            required = {"source_path", "series_id", "FY", "value"}
+            if not required.issubset(frame.columns):
+                continue
+            scoped = frame[frame["source_path"].astype(str).isin(paths)]
+            for row in scoped.itertuples():
+                fy = pd.to_numeric(pd.Series([row.FY]), errors="coerce").iloc[0]
+                value = pd.to_numeric(pd.Series([row.value]), errors="coerce").iloc[0]
+                if pd.isna(fy) or pd.isna(value):
+                    continue
+                if history_only and int(fy) >= 2026:
+                    continue
+                out.setdefault(str(row.series_id), {}).setdefault(int(fy), float(value))
     return out
 
 
@@ -956,7 +978,12 @@ def _collect_policy(
         str(row.stream): float(row.value) for row in elasticity_frame.itertuples()
     }
 
+    # The Current conditions baseline's committed calibration is ONE combined
+    # layer: displayed = base raw prediction x (combined conflict+policy price
+    # ratio) ^ elasticity x conflict GDP factor, all carried per quarter in
+    # the demand_* audit columns. Proven exact for every stream and quarter.
     price_ratio: dict[str, dict[str, float]] = {}
+    gdp_factor: dict[str, dict[str, float]] = {}
     reference_price: dict[str, dict[str, float]] = {}
     variant_price: dict[str, dict[str, float]] = {}
     calibrated: dict[str, dict[str, float]] = {}
@@ -964,19 +991,21 @@ def _collect_policy(
     max_rel = 0.0
     for stream in ("PED", "LIGHT_RUC", "HEAVY_RUC"):
         committed = _scenario_stream_frame(future, scenario, stream, "future forecasts")
-        ratio = _numeric(committed["policy_price_ratio"])
-        reference = _numeric(committed["policy_reference_forecast"])
+        ratio = _numeric(committed["demand_price_ratio"])
+        reference = _numeric(committed["demand_reference_forecast"])
+        gdp = _numeric(committed["demand_gdp_model_factor"])
         displayed = _numeric(committed["forecast"])
         epsilon = elasticities[stream]
         price_ratio[stream] = {str(q): float(v) for q, v in ratio.items() if pd.notna(v)}
+        gdp_factor[stream] = {str(q): float(v) for q, v in gdp.items() if pd.notna(v)}
         reference_price[stream] = {
             str(q): float(v)
-            for q, v in _numeric(committed["policy_reference_price"]).items()
+            for q, v in _numeric(committed["demand_reference_price"]).items()
             if pd.notna(v)
         }
         variant_price[stream] = {
             str(q): float(v)
-            for q, v in _numeric(committed["policy_variant_price"]).items()
+            for q, v in _numeric(committed["demand_variant_price"]).items()
             if pd.notna(v)
         }
         calibrated[stream] = {
@@ -985,15 +1014,18 @@ def _collect_policy(
         for quarter in price_ratio[stream]:
             ref_value = reference.get(quarter)
             shown = calibrated[stream].get(quarter)
-            if ref_value is None or shown is None or pd.isna(ref_value):
+            gdp_value = gdp_factor[stream].get(quarter)
+            if ref_value is None or shown is None or gdp_value is None or pd.isna(ref_value):
                 continue
-            rebuilt = float(ref_value) * price_ratio[stream][quarter] ** epsilon
+            rebuilt = (
+                float(ref_value)
+                * price_ratio[stream][quarter] ** epsilon
+                * gdp_value
+            )
             max_rel = max(max_rel, abs(rebuilt - shown) / abs(shown))
         if stream in ("LIGHT_RUC", "HEAVY_RUC"):
             detail: dict[str, dict[str, float]] = {}
             for column, key in (
-                ("policy_fuel_price_ratio", "fuel_price_ratio"),
-                ("policy_ruc_price_ratio", "ruc_price_ratio"),
                 ("demand_reference_fuel_cost_nzd_per_1000km", "reference_fuel_cost"),
                 ("demand_variant_fuel_cost_nzd_per_1000km", "variant_fuel_cost"),
                 ("demand_reference_ruc_price_nzd_per_1000km", "reference_ruc_price"),
@@ -1010,23 +1042,7 @@ def _collect_policy(
         data, "policy_calibration_identity", max_rel, _PARITY_TOLERANCE_REL
     )
 
-    ped_committed = _scenario_stream_frame(future, scenario, "PED", "future forecasts")
-    ped_inputs = _scenario_stream_frame(replay_inputs, scenario, "PED", "replay inputs")
     ped_nominal: dict[str, dict[str, float]] = {}
-    for column in (
-        "policy_free_source_nominal_petrol_cpl",
-        "policy_published_fed_wedge_nominal_cpl",
-        "policy_source_nominal_petrol_cpl",
-        "policy_target_nominal_petrol_cpl",
-        "policy_nominal_petrol_ratio",
-    ):
-        if column in ped_inputs.columns:
-            ped_nominal[column] = {
-                str(q): float(v)
-                for q, v in _numeric(ped_inputs[column]).items()
-                if pd.notna(v)
-            }
-    del ped_committed
 
     pair_id = str(_POLICY_PAIR_BY_STATE.get(str(spec.calculation_state_id), ""))
     annual_pair_factor: dict[str, dict[int, float]] = {}
@@ -1057,6 +1073,7 @@ def _collect_policy(
         pair_id=pair_id,
         elasticity=elasticities,
         price_ratio=price_ratio,
+        gdp_factor=gdp_factor,
         reference_price=reference_price,
         variant_price=variant_price,
         calibrated=calibrated,
@@ -1436,25 +1453,27 @@ def _collect_post_model(data: _GlassboxData, repo_root: Path, pack_dir: Path) ->
         shares["bev"][fy] = raw_shares[1] / total
         shares["phev"][fy] = raw_shares[2] / total
 
-    # The post-model tail anchors on the CENTRAL FY2030 level: the selected
-    # 12c policy's activity response is decision-grade only through FY2030,
-    # so the anchor is the displayed FY2030 value with that year's policy
-    # activity factor divided back out.
+    # The post-model tail anchors on the CENTRAL FY2030 level. Because the
+    # displayed first post-model value IS anchor x hybrid at that year (the
+    # tail carries no scenario or rate-path activity response), the anchor is
+    # recovered exactly as displayed / hybrid at the first extrapolation year
+    # - committed values only, no per-scenario factor bookkeeping.
     annual = data.annual_values
-    pair = data.policy.annual_pair_factor if data.policy is not None else {}
+    first_post_fy = int(FIRST_EXTRAPOLATION_FY)
 
-    def _central_anchor(series_id: str) -> float:
-        shown = annual.get(series_id, {}).get(ANCHOR_FY, math.nan)
-        factor = pair.get(series_id, {}).get(ANCHOR_FY, 1.0)
-        return shown / factor
+    def _anchor_from_first_post(series_ids: tuple[str, ...], stream: str) -> float:
+        shown = sum(
+            annual.get(series_id, {}).get(first_post_fy, math.nan)
+            for series_id in series_ids
+        )
+        return shown / hybrid_index[stream][first_post_fy]
 
     anchors = {
-        "light_petrol_vkt": _central_anchor("light_petrol_vkt"),
-        "heavy_ruc_net_km": _central_anchor("heavy_ruc_net_km"),
-        "light_ruc_pool": (
-            _central_anchor("light_ruc_net_km")
-            + _central_anchor("light_bev_ruc_net_km")
-            + _central_anchor("phev_ruc_net_km")
+        "light_petrol_vkt": _anchor_from_first_post(("light_petrol_vkt",), "light_petrol_vkt"),
+        "heavy_ruc_net_km": _anchor_from_first_post(("heavy_ruc_net_km",), "heavy_ruc_net_km"),
+        "light_ruc_pool": _anchor_from_first_post(
+            ("light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km"),
+            "light_ruc_pool",
         ),
     }
     scenario_population = {
@@ -1733,8 +1752,11 @@ def collect_glassbox_data(
 
     # Pack central Total RUC + the Treasury macro terminal-carry factor: the
     # committed primitives of the FY2031+ top-down RUC aggregate construction.
+    # The FY2031+ top-down RUC construction is CENTRAL regardless of the
+    # displayed trace (the conflict effect ends at FY2030 and the tail rides
+    # the central path exactly), so its primitives live on the base trace.
     pack_total = pack_chart_rows[
-        pack_chart_rows["trace_name"].astype(str).eq(data.trace_name)
+        pack_chart_rows["trace_name"].astype(str).eq("Current finalist Base case")
         & pack_chart_rows["time_grain"].astype(str).eq("june_year")
         & pack_chart_rows["series_id"].astype(str).eq("total_ruc_net_revenue")
     ]
@@ -1749,7 +1771,7 @@ def collect_glassbox_data(
     )
     terminal = macro_factors[
         macro_factors["series_id"].astype(str).eq("total_ruc_net_revenue")
-        & macro_factors["trace_name"].astype(str).eq(data.trace_name)
+        & macro_factors["trace_name"].astype(str).eq("Current finalist Base case")
         & pd.to_numeric(macro_factors["june_year"], errors="coerce").eq(2030)
     ]
     if terminal.empty:

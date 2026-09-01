@@ -318,34 +318,33 @@ def write_post_model_and_revenue_sections(grid, data) -> None:
     anchor_rows: dict[str, int] = {}
     prm_header = params_grid.row("prm.fy_header")
 
-    def _anchor_formula(series_ids: tuple[str, ...]) -> str:
+    def _anchor_formula(series_ids: tuple[str, ...], hybrid_row: int) -> str:
+        # The displayed first post-model year IS anchor x hybrid at that year
+        # (the tail carries no scenario demand response), so the anchor is
+        # displayed / hybrid there - committed values only.
+        first_post_col = _column_letter(_fy_column(_POST_FIRST_FY))
         terms = []
         for series_id in series_ids:
             annual_row = params_grid.row(f"prm.annual.{series_id}")
-            factor_row = params_grid.row(f"prm.pair_factor.{series_id}")
             terms.append(
-                _xlookup(str(data.post_model.anchor_fy),
+                _xlookup(str(_POST_FIRST_FY),
                          _fy_range(prm_header, SHEET_PARAMS),
                          _fy_range(annual_row, SHEET_PARAMS))
-                + "/"
-                + _xlookup(str(data.post_model.anchor_fy),
-                           _fy_range(prm_header, SHEET_PARAMS),
-                           _fy_range(factor_row, SHEET_PARAMS))
             )
-        return "=" + "+".join(terms)
+        return "=(" + "+".join(terms) + f")/{first_post_col}{hybrid_row}"
 
     for stream, series_ids, label in (
         ("light_petrol_vkt", ("light_petrol_vkt",),
-         "Central FY2030 anchor: light petrol VKT (displayed / activity factor)"),
+         "Central FY2030 anchor: light petrol VKT (displayed FY2031 / hybrid FY2031)"),
         ("light_ruc_pool", ("light_ruc_net_km", "light_bev_ruc_net_km", "phev_ruc_net_km"),
-         "Central FY2030 anchor: Light RUC pool (sum of central class anchors)"),
+         "Central FY2030 anchor: Light RUC pool (class sum FY2031 / hybrid FY2031)"),
         ("heavy_ruc_net_km", ("heavy_ruc_net_km",),
-         "Central FY2030 anchor: Heavy RUC km"),
+         "Central FY2030 anchor: Heavy RUC km (displayed FY2031 / hybrid FY2031)"),
     ):
         grid.register(f"e.anchor.{stream}", row)
         _set_label(grid, row, label, indent=1)
         cell = grid.ws.cell(row=row, column=_fy_column(data.post_model.anchor_fy))
-        cell.value = _anchor_formula(series_ids)
+        cell.value = _anchor_formula(series_ids, hybrid_rows[stream])
         cell.font = styles.formula
         cell.number_format = _NF_VALUE
         anchor_rows[stream] = row

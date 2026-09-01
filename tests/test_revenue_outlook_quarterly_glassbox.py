@@ -1,4 +1,4 @@
-"""Quarterly glass-box XLSX (Central + 12c rate path, AR(1) engine).
+"""Quarterly glass-box XLSX (Current conditions baseline + 12c rate path, AR(1)).
 
 Contract (owner request, 2026-09): a second download button beside the annual
 forecast extract producing a formula-driven quarterly workbook for the
@@ -326,7 +326,7 @@ def test_selection_gate_states_each_refusal() -> None:
 
 def test_result_identity(glassbox_result) -> None:
     assert glassbox_result.trace_name == GLASSBOX_SUPPORTED_TRACE
-    assert glassbox_result.scenario_name == "current_basecase_mcert"
+    assert glassbox_result.scenario_name == "middle_east_low__mcert"
 
 
 def test_download_button_appears_on_the_single_scenario_view() -> None:
