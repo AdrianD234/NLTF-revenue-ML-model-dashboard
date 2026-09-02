@@ -29,7 +29,7 @@
   "provenance": {
     "builder_version": "4",
     "code_module_hashes": {
-      "app.py": "b3ef3255648459b6873cbdb0b2c734111a84dfa274f1378335b030d331aaaa55",
+      "app.py": "937479b95d3a40735cf60764cc6d7aa69ad28f1f2c40fe99cfca220f51903138",
       "model_dashboard/__init__.py": "40f18fc5bbc37948a1250097bb55c68711d51d6622248e75efe27cd3580809f8",
       "model_dashboard/completeness_contract.py": "2a5ec576c757b7d4d820a060922dd5c7c7275841dc9734dcb479f9ad49a5c708",
       "model_dashboard/conflict_fuel_paths.py": "11fe97f6ef11a6c8545308a6a717d2c911e3e950309c6488c009de1f7d355078",
@@ -79,6 +79,7 @@
       "model_dashboard/revenue_outlook_excel_extract.py": "ab3e40067bcc185557883aa28385cbf6ed3b2a12dea9222f3bdb7021dc5ec0b8",
       "model_dashboard/revenue_outlook_policy_runtime.py": "8d08fe98a86df4064ffce97ef6245b49cd01d8165ad5da72adbba8f60c28492f",
       "model_dashboard/revenue_outlook_presentation_policy.py": "8144bf675983caadc0096c8e5f0e152c0c13098e4d87e58361c6dc5984fb1f81",
+      "model_dashboard/revenue_outlook_quarterly_glassbox.py": "ec281f9448be45b0fcced8eb1daf76a3ebd5b9eebf962ac88441824a692e1d86",
       "model_dashboard/revenue_outlook_replay_cache.py": "f24ea4013bb9169612a8d63008fb1ded2626bf780c272df6270fcbd6705eb518",
       "model_dashboard/revenue_scenario_key.py": "f1637fcb0fcda23e6a5fe37b09b024acb0fd455aed278d360b275365c2bd96b4",
       "model_dashboard/revenue_source_pack.py": "61b9fd2b06d4c16add928656b9bd6e5cda9dcb38b0f3d9a0f60fb5c1e2cf8c9c",
@@ -470,8 +471,8 @@
   },
   "row_count": 7237425,
   "schema_version": "4",
-  "source_digest": "0965ee7d0b607d67b278b42a4da95316ebec83be7877bcd844f42c3d5b56b998",
-  "source_main_sha": "d4d81b3683c5c0551ec78597971dd4c9a4b596b1",
+  "source_digest": "f791e9a6d916428aec5c51b944b5f61ae6885d5b79b40cc46ba2c53f52d9c5f9",
+  "source_main_sha": "0d71d99cfde102b7954572d8a91e019123c3b0ea",
   "state_count": 169,
   "states": [
     {

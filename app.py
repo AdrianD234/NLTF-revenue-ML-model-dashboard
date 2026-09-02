@@ -305,6 +305,14 @@ from model_dashboard.revenue_outlook_excel_extract import (
     RevenueOutlookExtractError,
     build_revenue_outlook_extract,
 )
+from model_dashboard.revenue_outlook_quarterly_glassbox import (
+    CHART_QUARTERLY_SERIES as GLASSBOX_QUARTERLY_SERIES,
+    GLASSBOX_BUTTON_LABEL,
+    GLASSBOX_SUPPORTED_TRACE,
+    RevenueOutlookGlassboxError,
+    build_quarterly_glassbox_workbook,
+    glassbox_supported_selection,
+)
 from model_dashboard.fed_ruc_transition import (
     FED_RUC_TRANSITION_LABELS,
     FED_RUC_TRANSITION_MANAGED,
@@ -3854,6 +3862,85 @@ def cached_revenue_outlook_extract_bytes(
             signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
         ),
         scenario_note=scenario_note,
+    )
+
+
+@st.cache_data(show_spinner=False, max_entries=2)
+def cached_quarterly_glassbox_bytes(
+    signature: tuple[tuple[str, int, int], ...],
+    sensitivity_key: tuple[str, ...],
+    bridge_mode: str,
+    ev_uptake_key: tuple[Any, ...],
+    pack_dir: str,
+    _pack: RevenueOutlookPack,
+):
+    """Quarterly glass-box workbook bytes for the Central Current-model path.
+
+    The quarterly display frame is assembled through the SAME per-series view
+    gate the Single-scenario chart uses (`_filter_series_rows_with_fallback`),
+    so every exported quarter is the number a reader sees on screen; the
+    builder then Python-verifies the model, policy, handover and rollup
+    identities against those values before writing a single cell.
+    """
+    rows, _, _, _, _ = cached_scenario_overlay_rows(
+        signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
+    )
+    view_rows, _ = _append_persistent_downside_rows(rows)
+    view_rows = _retether_high_population_to_central(view_rows)
+    official_scenario, official_overlay = _official_vintage_filter_for_key(ev_uptake_key)
+    view_rows = _filter_official_vintage_rows(view_rows, official_scenario, official_overlay)
+    view_rows = _mask_current_rows_through_official_actuals(view_rows, ev_uptake_key)
+
+    policy_state = str(getattr(ev_uptake_key, "current_fed_policy_state", "") or "")
+    label_by_series: dict[str, str] = {}
+    for series_id in GLASSBOX_QUARTERLY_SERIES:
+        labels = (
+            rows[rows["series_id"].astype(str).eq(series_id)]["series_label"]
+            .dropna()
+            .astype(str)
+            .unique()
+        )
+        if len(labels):
+            label_by_series[series_id] = labels[0]
+    quarterly_frames = []
+    for label in label_by_series.values():
+        filtered, _ = _filter_series_rows_with_fallback(
+            view_rows,
+            label,
+            "quarterly",
+            # Current-model rows carry the planned path; the 12c counterfactual
+            # is applied by the policy overlay, not by a fed_path variant.
+            "Current planned path",
+            (GLASSBOX_SUPPORTED_TRACE,),
+            policy_state=policy_state,
+            pack_dir=pack_dir,
+        )
+        quarterly_frames.append(filtered)
+    quarterly_rows = pd.concat(quarterly_frames, ignore_index=True, sort=False)
+
+    line_reconciliation, _, stack_components, _ = cached_aligned_scenario_detail_frames(
+        signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
+    )
+    value_frames = list(
+        _extract_extra_value_frames(
+            signature, sensitivity_key, bridge_mode, ev_uptake_key, _pack
+        )
+    ) + [
+        line_reconciliation,
+        stack_components,
+        _pack_table(_pack, "revenue_stack_components"),
+    ]
+    return build_quarterly_glassbox_workbook(
+        trace_name=GLASSBOX_SUPPORTED_TRACE,
+        engine=_engine_for_pack(_pack),
+        current_fed_policy_state=policy_state or "published",
+        quarterly_rows=quarterly_rows,
+        chart_rows=view_rows,
+        pack_chart_rows=_pack.revenue_chart_rows,
+        annual_value_frames=value_frames,
+        template_path=Path(__file__).resolve().parent / EXTRACT_TEMPLATE_RELATIVE_PATH,
+        repo_root=Path(__file__).resolve().parent,
+        pack_dir=Path(pack_dir),
     )
 
 
@@ -8101,6 +8188,62 @@ def render_revenue_outlook_page(loaded: LoadedRun) -> None:
                     "Selected traces missing from the extract (no governed "
                     "value source resolved - this is a defect): "
                     + ", ".join(extract_result.skipped_traces)
+                )
+
+        # Quarterly glass-box workbook: a formula-driven, auditable replay of
+        # the selected Current-model path (calendar quarters, rows 1-65
+        # preserved; coefficient chains for the linear pieces, exact imported
+        # component predictions for the tree pieces). Current-model central
+        # path only; other selections state why they are unsupported.
+        # The workbook always targets the central view (the Current
+        # conditions baseline trace), whether or not that layer is ticked in
+        # the chart picker - the overlay rows always carry it.
+        glassbox_refusal = glassbox_supported_selection(
+            trace_name=GLASSBOX_SUPPORTED_TRACE,
+            engine=engine,
+            uptake_basis=selected_ev_uptake_mode,
+            custom_ev_levers=custom_ev_levers,
+            eruc_levers=eruc_lever_values if eruc_enabled else (),
+            ped_retention_sensitivity=ped_retention_sensitivity,
+            fed_ruc_transition=fed_ruc_transition_state,
+            sensitivities_off=(
+                sensitivity_key == selected_sensitivity_key("Off", "Off", "Off")
+            ),
+        )
+        if glassbox_refusal:
+            st.caption(f"Quarterly glass-box XLSX unavailable: {glassbox_refusal}")
+        else:
+            try:
+                glassbox_result = cached_quarterly_glassbox_bytes(
+                    pack_signature,
+                    sensitivity_key,
+                    selected_ped_bridge_mode,
+                    ev_uptake_key,
+                    str(pack_dir),
+                    pack,
+                )
+            except RevenueOutlookGlassboxError as error:
+                st.caption(f"Quarterly glass-box XLSX unavailable: {error}")
+            else:
+                st.download_button(
+                    GLASSBOX_BUTTON_LABEL,
+                    data=glassbox_result.workbook_bytes,
+                    file_name=(
+                        "revenue_outlook_quarterly_glassbox_"
+                        f"{datetime.now(timezone.utc):%Y%m%d}_"
+                        f"{glassbox_result.scenario_name}.xlsx"
+                    ),
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    key="revenue_outlook_quarterly_glassbox_download",
+                    help=(
+                        "Formula-driven quarterly replay of this scenario: rows "
+                        "1-65 preserved on calendar quarters to 2050Q2, with the "
+                        "PED coefficient chain, the Light RUC OLS base + exact "
+                        "GBR residual, the Heavy RUC weighted ensemble, the "
+                        "policy overlay, the PREBU growth handover and every "
+                        "revenue identity linked as Excel formulas. The Checks "
+                        "sheet must show PASS on every row after recalculation."
+                    ),
                 )
 
     if not compare_mode and method_detail_enabled() and st.toggle(

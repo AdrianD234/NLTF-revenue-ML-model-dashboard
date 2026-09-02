@@ -61,6 +61,7 @@ test_groups:
       - tests/test_revenue_outlook_trace_identity.py
       - tests/test_revenue_source_app_views.py
       - tests/test_revenue_outlook_excel_extract.py
+      - tests/test_revenue_outlook_quarterly_glassbox.py
 
   revenue_outlook_calculation:
     description: The forward revenue computation itself and its levers.
@@ -131,6 +132,9 @@ test_groups:
       - tests/test_heavy_ruc_parent_fitted_state.py
       - tests/test_light_ruc_promoted_state.py
       - tests/test_light_ruc_anchor_design.py
+      # The quarterly glass-box hardwires the fitted-state coefficient maps;
+      # a model swap must break its contract test, not a reader's workbook.
+      - tests/test_revenue_outlook_quarterly_glassbox.py
 
   governance_r2:
     description: R-squared ladders, score basis and governance page sourcing.
@@ -157,6 +161,7 @@ test_groups:
       - tests/test_long_horizon_rolling_origin.py
       - tests/test_stress_horizon_validation.py
       - tests/test_stress_horizon_aliases.py
+      - tests/test_revenue_outlook_quarterly_glassbox.py
 
   data_refresh:
     description: Source-workbook ingestion, vintages and the MBU26 spine.
@@ -427,6 +432,9 @@ rules:
       - "model_dashboard/revenue_chart_layers.py"
       - "model_dashboard/chart_sources.py"
       - "model_dashboard/revenue_outlook_excel_extract.py"
+      - "model_dashboard/revenue_outlook_quarterly_glassbox.py"
+      - "model_dashboard/_quarterly_glassbox_writer.py"
+      - "model_dashboard/_quarterly_glassbox_writer_sections.py"
       - "templates/**"
       # Display-only comparator workbook the A/B panel can overlay. Read at
       # render time, never by a governed computation, so a change here is a
