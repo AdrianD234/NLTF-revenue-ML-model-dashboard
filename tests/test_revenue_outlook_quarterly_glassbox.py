@@ -351,3 +351,49 @@ def test_download_button_appears_on_the_single_scenario_view() -> None:
     assert not harness.exception
     labels = [str(element.proto.label) for element in harness.get("download_button")]
     assert GLASSBOX_BUTTON_LABEL not in labels
+
+
+# ---------------------------------------------------------------------------
+# Model-contract coupling: the glass-box hardwires the PED / Light RUC
+# coefficient maps and the Heavy RUC ensemble shape. Swapping a finalist must
+# fail HERE with a pointer to the map, not deep inside a workbook build.
+# ---------------------------------------------------------------------------
+
+
+def test_glassbox_coefficient_maps_match_the_governed_fitted_states() -> None:
+    import json
+
+    import pipeline.vnext_forward as vnext_forward
+    from model_dashboard.forecast_runner import (
+        LIGHT_RUC_BASE_FEATURES,
+        load_light_ruc_promoted_state,
+    )
+    from model_dashboard.revenue_outlook_quarterly_glassbox import (
+        LIGHT_COEFFICIENT_NAMES,
+        PED_COEFFICIENT_NAMES,
+        _HEAVY_MANIFEST_REL,
+        _PED_AR1_STATE_REL,
+    )
+
+    ped_state = json.loads((ROOT / _PED_AR1_STATE_REL).read_text(encoding="utf-8"))
+    assert list(ped_state["features"]) == [name for name, _ in PED_COEFFICIENT_NAMES], (
+        "PED AR(1) fitted-state features changed: update PED_COEFFICIENT_NAMES in "
+        "model_dashboard/revenue_outlook_quarterly_glassbox.py and the Model "
+        "Parameters labels in _quarterly_glassbox_writer.py."
+    )
+    assert len(ped_state["beta"]) == len(PED_COEFFICIENT_NAMES) + 2  # b0 + features + ylag
+    assert list(ped_state["ylags"]) == [1] and len(ped_state["rho"]) == 1
+
+    assert list(LIGHT_RUC_BASE_FEATURES) == [name for name, _ in LIGHT_COEFFICIENT_NAMES], (
+        "Light RUC OLS base features changed: update LIGHT_COEFFICIENT_NAMES."
+    )
+    vnext_forward._register_legacy_sklearn_loss_module_alias()
+    light_state = load_light_ruc_promoted_state(ROOT)
+    assert light_state.ols_beta.shape == (len(LIGHT_COEFFICIENT_NAMES) + 1,)
+
+    heavy = json.loads((ROOT / _HEAVY_MANIFEST_REL).read_text(encoding="utf-8"))
+    members = heavy.get("members") or heavy.get("production_states") or {}
+    assert len(members) == 3, (
+        "Heavy RUC ensemble shape changed: the workbook names HR_W1..HR_W3 and "
+        "labels M1 as the linear (Ridge) component - update the writer."
+    )

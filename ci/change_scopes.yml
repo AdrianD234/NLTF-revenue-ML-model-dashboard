@@ -132,6 +132,9 @@ test_groups:
       - tests/test_heavy_ruc_parent_fitted_state.py
       - tests/test_light_ruc_promoted_state.py
       - tests/test_light_ruc_anchor_design.py
+      # The quarterly glass-box hardwires the fitted-state coefficient maps;
+      # a model swap must break its contract test, not a reader's workbook.
+      - tests/test_revenue_outlook_quarterly_glassbox.py
 
   governance_r2:
     description: R-squared ladders, score basis and governance page sourcing.
@@ -158,6 +161,7 @@ test_groups:
       - tests/test_long_horizon_rolling_origin.py
       - tests/test_stress_horizon_validation.py
       - tests/test_stress_horizon_aliases.py
+      - tests/test_revenue_outlook_quarterly_glassbox.py
 
   data_refresh:
     description: Source-workbook ingestion, vintages and the MBU26 spine.
